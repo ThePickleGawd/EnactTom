@@ -1,0 +1,12 @@
+# @package habitat.dataset
+
+defaults:
+  - /habitat/dataset: dataset_config_schema
+  - _self_
+
+type: EnactToMDataset-v0
+split: train
+# Use train_2k for diverse scenes (2000 episodes, 38 unique scenes)
+# ci.json.gz only has 4 episodes in 2 scenes (for CI testing only)
+data_path: ${oc.env:ENACTTOM_EPISODES_PATH,data/datasets/enacttom_episodes/v0_0/train_2k.json.gz}
+scenes_dir: data/hssd-hab

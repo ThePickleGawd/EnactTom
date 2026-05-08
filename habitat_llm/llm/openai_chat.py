@@ -15,7 +15,7 @@ from openai import OpenAI
 # Suppress verbose httpx logs from OpenAI client
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-from emtom.api_costs import maybe_append_usage_event
+from enacttom.api_costs import maybe_append_usage_event
 from habitat_llm.llm.base_llm import BaseLLM, Prompt
 
 # Load .env file if it exists (for API keys)

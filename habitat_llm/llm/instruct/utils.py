@@ -4,29 +4,7 @@
 
 from __future__ import annotations
 
-import typing
-from typing import Dict, List, Tuple
-
-import regex as re
-
-if typing.TYPE_CHECKING:
-    from habitat_llm.evaluation.evaluation_runner import ActionHistoryElement
-
-import base64
-import io
-
-from PIL import Image
-
-from habitat_llm.world_model.world_graph import WorldGraph
-
-PERCEPTION_TOOL_STRINGS = [
-    "FindAgentActionTool",
-    "FindObjectTool",
-    "FindReceptacleTool",
-    "FindRoomTool",
-]
-SINGLE_STEP_PROMPT_HEADER = "Solve the given multi-agent planning problem as best as you can. The task assigned to you will be situated in a house and will generally involve navigating to objects, picking and placing them on different receptacles to achieve rearrangement. Below is the detailed description of the actions you can use for solving the task."
-STOP_WORD = "<end_act>"
+from typing import Dict, Tuple
 
 
 def get_world_descr(
@@ -118,22 +96,18 @@ def get_objects_descr(
                             f"Multiple rooms detected for object {obj.name}"
                         )
                     room_name = rooms[0].name
-            if not centralized and (
-                world_graph.is_object_with_robot(obj)
-                and int(agent_uid) == 0
-                or (world_graph.is_object_with_human(obj) and int(agent_uid) == 1)
+            holding_agent = world_graph.get_agent_holding_object(obj)
+            agent_name = f"agent_{agent_uid}"
+            if (
+                not centralized
+                and holding_agent is not None
+                and holding_agent.name == agent_name
             ):
                 obj_info += obj.name + ": held by the agent"
-            elif not centralized and (
-                world_graph.is_object_with_human(obj)
-                and int(agent_uid) == 0
-                or (world_graph.is_object_with_robot(obj) and int(agent_uid) == 1)
-            ):
-                obj_info += obj.name + ": held by the other agent"
-            elif centralized and world_graph.is_object_with_robot(obj):
-                obj_info += obj.name + ": held by Agent 0 (Robot)"
-            elif centralized and world_graph.is_object_with_human(obj):
-                obj_info += obj.name + ": held by Agent 1 (Human)"
+            elif not centralized and holding_agent is not None:
+                obj_info += obj.name + f": held by {holding_agent.name}"
+            elif centralized and holding_agent is not None:
+                obj_info += obj.name + f": held by {holding_agent.name}"
             else:
                 furn_node = world_graph.find_furniture_for_object(obj)
                 furn_name = "unknown" if furn_node is None else furn_node.name
@@ -180,202 +154,8 @@ def get_rearranged_objects_descr(
     return "\n".join(updated_objs)
 
 
-def build_single_step_prompt(
-    task: str,
-    world_graph: WorldGraph,
-    agent_uid: str,
-    action_history: Dict[str, List[ActionHistoryElement]],
-    action_representation=True,
-    tools_to_skip=None,
-):
-    """
-    Constructs the prompt for a single step planner.
-
-    This function gathers all actions of the specified agent and all actions of other agents from the environment interface's action history or state history based on the action_representation parameter.
-
-    The function assumes that the environment interface's action history and state history contain actions and states of exactly two agents with UIDs '0' and '1'.
-
-    :param task: The instruction assigned to the agent.
-    :param world_graph: The current environment world graph.
-    :param agent_uid: The UID of the agent for which to construct the prompt.
-    :param action_representation: Boolean flag to determine whether to use action history or state history.
-    :return: The constructed prompt.
-    """
-    if tools_to_skip is None:
-        tools_to_skip = []
-    all_actions: List[ActionHistoryElement] = []
-    if action_representation:
-        all_actions = sum(action_history.values(), [])
-    else:
-        raise NotImplementedError("State history not implemented")
-        # for agent, actions in action_history.items():
-        #     if int(agent) == int(agent_uid):
-        #         all_actions.extend(actions)
-        # # Extract other agent's actions from agent_state_history
-        # for agent, states in agent_state_history.items():
-        #     if int(agent) != int(agent_uid):
-        #         all_actions.extend(states)
-
-    prev_action_string = ""
-    all_actions.sort(key=lambda x: x.timestamp)
-    # remove perception tools from the list of actions
-    all_actions = [
-        action
-        for action in all_actions
-        if not hasattr(action, "action") or action.action[0] not in tools_to_skip
-    ]
-    strings = []
-    for action in all_actions:
-        if int(action.agent_uid) == int(agent_uid):
-            strings.append(f"Agent_Action: {action.to_string()}")
-            strings.append(f"Action Result: {action.response}")
-        elif (
-            "navigate" not in action.to_string().lower()
-            and "find" not in action.to_string().lower()
-            and "explore" not in action.to_string().lower()
-        ):
-            # We dont want to add Explore actions
-            strings.append(f"Other_Agent_Action: {action.to_string()}")
-
-    prev_action_string = (
-        "\n".join(strings) if len(strings) > 0 else "No previous actions taken"
-    )
-
-    world_graph_string = get_world_descr(world_graph)
-    task_text = f"Task: {task}"
-    graph_text = f"Current Environment:\n{world_graph_string}"
-    previous_actions = "Previous actions:\n" + prev_action_string
-    curr_action_str = "Next Agent_Action:<|reserved_special_token_0|>"
-    new_text = "\n\n".join(
-        [SINGLE_STEP_PROMPT_HEADER]
-        + [task_text, graph_text, previous_actions, curr_action_str]
-    )
-    return new_text
-
-
-def zero_shot_prompt_action_parser(text):
-    """
-    This method parses the llm response to extract
-    Action (tool name) and Action Input which can be
-    used to execute a specific action via Tool
-    """
-    regex = r"Action: (.*?)[\n]*Action Input: (.*)"
-    match = re.search(regex, text, re.DOTALL)
-    if not match:
-        print(text)
-        raise ValueError(f"Could not parse LLM output: `{text}`")
-    action = match.group(1).strip()
-    action_input = match.group(2)
-    # Remove quotes and whitespace and \n
-    return action, action_input.strip(" ").strip('"').strip("\n")
-
-
-def action_in_brackets_parser(text):
-    """
-    This method parses the llm response to extract
-    Action (tool name) and Action Input from a string with bracketed syntax.
-    e.g. "NavigateSkill[sofa_0]" -> "NavigateSkill", "sofa_0"
-    """
-    action_prefix = "Action: "
-
-    if not text.split("\n")[-1].startswith(action_prefix):
-        return None
-
-    action_block = text.split("\n")[-1]
-    action_str = action_block[len(action_prefix) :]
-
-    # Parse out the action and the directive.
-    re_matches = re.search(r"(.*?)\[(.*?)\]", action_str)
-    if re_matches is None:
-        raise ValueError(f"Could not parse action directive: {action_str}")
-
-    return re_matches.group(1), re_matches.group(2)
-
-
-def zero_shot_prompt_agent_action_parser(text):
-    """
-    This method parses the llm response to extract
-    Action (tool name) and Action Input and Agent uid from a string.
-    """
-    regex = r"Action: (.*?)[\n]*Action Input: (.*)[\n]*Agent: (.*)"
-    match = re.search(regex, text, re.DOTALL)
-    if not match:
-        print(text)
-        raise ValueError(f"Could not parse LLM output: `{text}`")
-    action = match.group(1).strip()
-    action_input = match.group(2).strip()
-    agent = match.group(3)
-
-    # Remove quotes and whitespace and \n
-    return agent.strip(" ").strip('"').strip("\n"), action, action_input
-
-
 def has_valid_square_brackets(input_string):
     return "[" in input_string and "]" in input_string
-
-
-def split_string(input_string, delimiter=","):
-    # Early return if string does not have delimiter
-    if delimiter not in input_string:
-        return input_string
-
-    # Remove spaces
-    input_string_filtered = input_string.replace(" ", "")
-
-    # Split at delimiter
-    substrings = input_string_filtered.split(delimiter)
-
-    return substrings
-
-
-def most_matching_string(input_str, candidate_strings):
-    """
-    Method to get most matching string
-    """
-
-    # Remove non-alphabetical characters from the input string and candidate strings
-    input_str_filtered = "".join(filter(str.isalnum, input_str))
-    candidate_strings_stripped = [
-        "".join(filter(str.isalnum, cand)) for cand in candidate_strings
-    ]
-
-    # Initialize variables to keep track of the most matching string and the number of matching characters
-    max_matching_string = ""
-    max_matching_chars = 0
-
-    # Loop through each candidate string and count the number of matching characters
-    for i, cand in enumerate(candidate_strings_stripped):
-        matching_chars = len(
-            list(filter(lambda x: x[0] == x[1], zip(input_str_filtered, cand)))
-        )
-        if matching_chars > max_matching_chars:
-            max_matching_string = candidate_strings[i]
-            max_matching_chars = matching_chars
-
-    return max_matching_string
-
-
-def fetch_from_valid_search_space(action_name, action_input, agent_id, params=None):
-    # Return inputs as they are if params is none
-    if params == None:
-        return action_name, action_input
-
-    # Get the best matching action name
-    tool_list = list(params["tool_list"])
-    action_name_corrected = most_matching_string(action_name, tool_list)
-
-    # Get the best matching action input
-    motor_actions = ["navigate", "open", "close", "rearrange", "pick", "place"]
-    if any(motor_action in action_name.lower() for motor_action in motor_actions):
-        substrings = split_string(action_input, ",")
-        valid_node_names = params["world_graph"][agent_id].get_all_node_names()
-        action_input_corrected = ", ".join(
-            most_matching_string(substr, valid_node_names) for substr in substrings
-        )
-    else:
-        action_input_corrected = action_input
-
-    return action_name_corrected, action_input_corrected
 
 
 def remove_non_alpha_left(input_string):
@@ -388,16 +168,6 @@ def remove_non_alpha_left(input_string):
         if char.isalpha():
             return input_string[i:]
     return ""
-
-
-def zero_shot_action_parser(agents, input_string, params=None):
-    # get the skill call before the Assigned!
-    action_line = input_string.strip().split("\n")[-1]
-    # this parser is for single agent only
-    assert len(agents) == 1
-    agent_id = agents[0].uid
-    # reuse the existing parser
-    return actions_parser(agents, f"Agent_{agent_id}_Action: {action_line}", params)
 
 
 def actions_parser(
@@ -458,50 +228,12 @@ def actions_parser(
                 )
                 continue
 
-            # Add error message for invalid actions
-            if agent_id == 0:
-                if "Fill" in action_info:
-                    actions_dict[agent_id] = (
-                        None,
-                        None,
-                        "Your agent cannot fill objects. You should let your partner agent do this part of the task and move on to other parts of the task. If you are holding a corresponding object for this action, please place it on a receptacle with faucet.",
-                    )
-                elif "Clean" in action_info:
-                    actions_dict[agent_id] = (
-                        None,
-                        None,
-                        "Your agent cannot clean or wash objects. You should let your partner agent do this part of the task and move on to other parts of the task. If you are holding a corresponding object for this action, please place it on the floor and proceed to other parts of the task.",
-                    )
-                elif "PoweredOn" in action_info:
-                    actions_dict[agent_id] = (
-                        None,
-                        None,
-                        "Your agent cannot turn on objects. You should let your partner agent do this part of the task and move on to other parts of the task",
-                    )
-                elif "PoweredOff" in action_info:
-                    actions_dict[agent_id] = (
-                        None,
-                        None,
-                        "Your agent cannot turn off objects. You should let your partner agent do this part of the task and move on to other parts of the task",
-                    )
-                else:
-                    if params and not any(
-                        tool in action_info for tool in params["tool_list"]
-                    ):
-                        actions_dict[agent_id] = (
-                            None,
-                            None,
-                            "This tool/action is invalid for your agent. So no actions will be assigned to the agent. Please re-think what your agent should do for the task and assign a valid action to the agent.",
-                        )
-            else:
-                if params and not any(
-                    tool in action_info for tool in params["tool_list"]
-                ):
-                    actions_dict[agent_id] = (
-                        None,
-                        None,
-                        "This tool/action is invalid for your agent. So no actions will be assigned to the agent. Please re-think what your agent should do for the task and assign a valid action to the agent.",
-                    )
+            if params and not any(tool in action_info for tool in params["tool_list"]):
+                actions_dict[agent_id] = (
+                    None,
+                    None,
+                    "This tool/action is invalid for your agent. No action will be assigned to the agent.",
+                )
 
             # Split the action info into action name and action arguments (inputs)
             action_name, action_input = action_info.split("[", 1)
@@ -515,48 +247,3 @@ def actions_parser(
             actions_dict[agent_id] = (action_name, action_input, None)
 
     return actions_dict
-
-
-def finetuned_actions_parser(
-    agent_id: int, agents: dict, input_string: str, params=None
-):
-    """
-    Parses an input string to extract an action and its parameters.
-
-    Input strings will be in the format "action[parameters]".
-    :param input_string: The input string to parse.
-    :param params: Unused to match the signature of other action parsers
-    :param agent_id: The unique identifier of the agent performing the action.
-    """
-    assert (
-        agent_id is not None
-    ), "Agent ID must be provided for finetuned actions parser."
-    pattern = r"(\w+)\[(.*?)\]"
-    matches = re.match(pattern, input_string)
-    if matches is None:
-        return {}
-    else:
-        return {agent_id: (matches[1], matches[2], None)}
-
-
-def image_data_to_pil(data: str):
-    header = "data:image/png;base64,"
-    return Image.open(
-        io.BytesIO(base64.decodebytes(bytes(data.split(header)[1], "utf-8")))
-    )
-
-
-def pil_image_to_data_url(image: Image, fmt: str = "png"):
-    """
-    Convert a PIL image to a base64-encoded data URL.
-    """
-    buffered = io.BytesIO()
-    save_fmt = "JPEG" if fmt.lower() in ("jpg", "jpeg") else fmt.upper()
-    image.save(buffered, format=save_fmt)
-    img_byte = buffered.getvalue()
-    base64_encoded_data = base64.b64encode(img_byte).decode("utf-8")
-
-    mime_type = f"image/{fmt.lower()}"
-
-    # Construct the data URL
-    return f"data:{mime_type};base64,{base64_encoded_data}"

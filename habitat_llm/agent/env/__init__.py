@@ -5,7 +5,7 @@
 # isort: skip_file
 
 from habitat_llm.agent.env.actions import find_action_range, register_actions
-from habitat_llm.agent.env.dataset import CollaborationDatasetV0
+from habitat_llm.agent.env.dataset import EnactToMDatasetV0
 from habitat_llm.agent.env.measures import register_measures
 from habitat_llm.agent.env.sensors import register_sensors, remove_visual_sensors
 from habitat_llm.agent.env.environment_interface import EnvironmentInterface

@@ -13,7 +13,7 @@ import boto3
 from botocore.exceptions import ClientError
 from omegaconf import DictConfig
 
-from emtom.api_costs import maybe_append_usage_event
+from enacttom.api_costs import maybe_append_usage_event
 from habitat_llm.llm.base_llm import BaseLLM, LLMRequestError, Prompt
 
 # Load .env file if it exists (for AWS credentials)

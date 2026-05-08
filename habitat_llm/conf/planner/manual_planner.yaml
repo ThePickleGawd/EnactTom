@@ -1,5 +1,0 @@
-_target_: habitat_llm.planner.manual_planner.ManualPlanner
-_recursive_: False
-_partial_: True
-
-plan_config: {}

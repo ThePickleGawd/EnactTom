@@ -10,12 +10,22 @@ from omegaconf import DictConfig, OmegaConf
 
 import habitat_llm
 from habitat_llm.llm.base_llm import BaseLLM
-from habitat_llm.llm.anthropic_claude import AnthropicClaude  # noqa: F401
-from habitat_llm.llm.bedrock_claude import BedrockClaude  # noqa: F401
-from habitat_llm.llm.hf_model import HFModel  # noqa: F401
-from habitat_llm.llm.llama import Llama  # noqa: F401
-from habitat_llm.llm.multimodal_llama import MultiModalLlama  # noqa: F401
-from habitat_llm.llm.openai_chat import OpenAIChat  # noqa: F401
+
+
+def __getattr__(name):
+    if name == "AnthropicClaude":
+        from habitat_llm.llm.anthropic_claude import AnthropicClaude
+
+        return AnthropicClaude
+    if name == "BedrockClaude":
+        from habitat_llm.llm.bedrock_claude import BedrockClaude
+
+        return BedrockClaude
+    if name == "OpenAIChat":
+        from habitat_llm.llm.openai_chat import OpenAIChat
+
+        return OpenAIChat
+    raise AttributeError(name)
 
 
 def instantiate_llm(

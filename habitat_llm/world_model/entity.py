@@ -190,22 +190,3 @@ class SpotRobot(Entity):
             copy.deepcopy(self.properties, memo),
             copy.deepcopy(self.sim_handle, memo),
         )
-
-
-class Human(Entity):
-    """
-    This class represents human
-    """
-
-    # Parameterized Constructor
-    def __init__(self, name, properties, sim_handle=None):
-        # Call Entity constructor
-        super().__init__(name, properties, sim_handle)
-
-    # Deep copy
-    def __deepcopy__(self, memo):
-        return Human(
-            copy.deepcopy(self.name, memo),
-            copy.deepcopy(self.properties, memo),
-            copy.deepcopy(self.sim_handle, memo),
-        )

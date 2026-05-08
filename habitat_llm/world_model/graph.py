@@ -10,7 +10,6 @@ import random
 from habitat_llm.world_model import (
     Entity,
     Furniture,
-    Human,
     Object,
     Receptacle,
     Room,
@@ -328,7 +327,7 @@ class Graph:
 
         # Now add all new edges
         for curr_node in other_graph.graph:
-            if isinstance(curr_node, (Object, SpotRobot, Human)):
+            if isinstance(curr_node, (Object, SpotRobot)):
                 delete_list = []
                 if not add_only:
                     for old_neighbor, _edge in self.graph[curr_node].items():
@@ -447,12 +446,6 @@ class Graph:
             # Print the node based on the class type
             if isinstance(neighbor, SpotRobot):
                 text = f"\tSpotRobot: {neighbor.name}"
-                out = (
-                    out + text + "\n" if out != None else print(text, file=file_handle)
-                )
-
-            elif isinstance(neighbor, Human):
-                text = f"\tHuman: {neighbor.name}"
                 out = (
                     out + text + "\n" if out != None else print(text, file=file_handle)
                 )

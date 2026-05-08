@@ -7,11 +7,11 @@ defaults:
 habitat_baselines:
 
   # Paths
-  video_dir: /tmp/emtom_video
-  tensorboard_dir: /tmp/emtom_logs
-  eval_ckpt_path_dir: /tmp/emtom_checkpoints
-  checkpoint_folder: /tmp/emtom_checkpoints
-  log_file: /tmp/emtom_train.log
+  video_dir: /tmp/enacttom_video
+  tensorboard_dir: /tmp/enacttom_logs
+  eval_ckpt_path_dir: /tmp/enacttom_checkpoints
+  checkpoint_folder: /tmp/enacttom_checkpoints
+  log_file: /tmp/enacttom_train.log
   writer_type: 'wb'
   load_resume_state_config: False
 

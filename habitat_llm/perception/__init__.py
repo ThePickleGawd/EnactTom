@@ -3,5 +3,4 @@
 # LICENSE file in the root directory of this source tree
 
 from habitat_llm.perception.perception import Perception
-from habitat_llm.perception.perception_obs import PerceptionObs
 from habitat_llm.perception.perception_sim import PerceptionSim

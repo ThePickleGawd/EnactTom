@@ -5,7 +5,7 @@
 from setuptools import find_packages, setup
 
 setup(
-    name="habitat_llm",
+    name="enacttom",
     version="1.0",
     packages=find_packages(),
 )

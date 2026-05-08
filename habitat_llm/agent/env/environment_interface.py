@@ -2,8 +2,6 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-import glob
-import json
 import os
 from collections import OrderedDict, defaultdict
 from typing import Any, Dict, List
@@ -25,7 +23,7 @@ from habitat_baselines.utils.common import batch_obs, get_num_actions
 from habitat_sim.utils.viz_utils import depth_to_rgb
 
 from habitat_llm.agent.env.sensors import SENSOR_MAPPINGS
-from habitat_llm.perception import PerceptionObs, PerceptionSim
+from habitat_llm.perception import PerceptionSim
 from habitat_llm.sims.metadata_interface import get_metadata_dict_from_config
 from habitat_llm.utils.core import separate_agent_idx
 
@@ -82,16 +80,10 @@ class EnvironmentInterface:
         self.mappings = SENSOR_MAPPINGS
         self._dry_run = self.conf.dry_run
 
-        # Set human and robot agent uids
-        self.robot_agent_uid = self.conf.robot_agent_uid
-        self.human_agent_uid = self.conf.human_agent_uid
-
         # merge metadata config and defaults
         self.metadata_dict = get_metadata_dict_from_config(conf.habitat.dataset)
 
-        # Create instance perceptionSim and WorldModel
-        # FIXME: below is same as self.wm_update_mode, remove one in favor of other
-        self.perception_mode = conf.world_model.update_mode
+        # Create simulator-derived perception and world model.
         if init_wg:
             self.initialize_perception_and_world_graph()
 
@@ -204,16 +196,14 @@ class EnvironmentInterface:
         """
         This method initializes perception and world graph
         """
-        # Create instance of perception
-        if self.perception_mode == "gt":
-            self.perception = PerceptionSim(self.sim, self.metadata_dict)
-        else:
-            self.perception = PerceptionObs(self.sim, self.metadata_dict)
         # Set the partial observability flag
         self.partial_obs = self.conf.world_model.partial_obs
 
         # set update mode flag: str: gt or obs
         self.wm_update_mode: str = self.conf.world_model.update_mode
+        if self.wm_update_mode != "gt":
+            raise ValueError("Only gt world-model updates are supported in EnactToM.")
+        self.perception = PerceptionSim(self.sim, self.metadata_dict)
 
         # Create instance of the world model
         # static world-graph for full obs setting
@@ -250,54 +240,7 @@ class EnvironmentInterface:
         most_recent_graph = self.perception.initialize(False)
         self.full_world_graph.update(most_recent_graph, False, "gt", add_only=True)
 
-        # based on the type of world-model being used, setup the data-source
-        if self.conf.world_model.type == "concept_graph":
-            self.world_graph[self.robot_agent_uid].world_model_type = "non_privileged"
-            # initialize the human agent's world-graph from sim with partial observability
-            subgraph = self.perception.initialize(partial_obs=self.partial_obs)
-            self.world_graph[self.conf.human_agent_uid].update(
-                subgraph, self.partial_obs, "gt", add_only=True
-            )
-
-            # initialize robot agent's world-graph from CG
-            cg_json = None
-            cg_json_path = self.conf.world_model.world_model_data_path
-
-            # CG for a given scene should be read from data based on scene-id
-            current_episode_metadata = self.env.env.env._env.current_episode
-            current_episode_id = current_episode_metadata.episode_id
-            current_scene_id = current_episode_metadata.scene_id
-            glob_expr = os.path.join(cg_json_path, f"*{current_scene_id}.json")
-            cg_file = glob.glob(glob_expr)
-
-            # handle the case if there is not CG for this scene
-            if not cg_file:
-                raise FileNotFoundError(
-                    f"Skipping Episode# {current_episode_id}, Scene# {current_scene_id} as we do not have CG for this",
-                )
-            if len(cg_file) > 1:
-                raise RuntimeError(
-                    f"Found more than 1 CG for scene: {current_scene_id}; skipping",
-                )
-            print(f"Found 1 CG for scene: {current_scene_id}; file: {cg_file[0]}")
-            with open(cg_file[0], "r") as f:
-                cg_json = json.load(f)
-
-            if not isinstance(
-                self.world_graph[self.conf.robot_agent_uid], DynamicWorldGraph
-            ):
-                raise ValueError(
-                    "Expected robot's world-graph to be of type DynamicWorldGraph, however found: ",
-                    type(self.world_graph[self.conf.robot_agent_uid]),
-                )
-            self.world_graph[self.conf.robot_agent_uid].create_cg_edges(
-                cg_json, include_objects=self.conf.world_model.include_objects
-            )
-            self.world_graph[self.conf.robot_agent_uid].initialize_agent_nodes(subgraph)
-            self.world_graph[
-                self.robot_agent_uid
-            ]._set_sim_handles_for_non_privileged_graph(self.perception)
-        elif self.conf.world_model.type == "gt_graph":
+        if self.conf.world_model.type == "gt_graph":
             subgraph = self.perception.initialize(self.partial_obs)
             # Get ground truth subgraph from the current observations.
             # since the graph is being initialized, we only add the new nodes and edges
@@ -597,16 +540,8 @@ class EnvironmentInterface:
             most_recent_graph, partial_obs=False, update_mode="gt"
         )
 
-        # Update agents world graphs using concept graph
-        if self.conf.world_model.type == "concept_graph" and isinstance(
-            self.perception, PerceptionObs
-        ):
-            self.update_world_graphs_using_concept_graph(obs)
-
         # Update agents world graphs using simulator
-        elif self.conf.world_model.type == "gt_graph" and not isinstance(
-            self.perception, PerceptionObs
-        ):
+        if self.conf.world_model.type == "gt_graph":
             self.update_world_graphs_using_sim(obs)
 
         # if applicable save the data from trajectory step
@@ -641,52 +576,6 @@ class EnvironmentInterface:
                 )
 
         return
-
-    def update_world_graphs_using_concept_graph(self, obs):
-        """
-        This method updates world graphs for both agents using
-        concept graph and simulator. Under concept graph regime,
-        we always operate under partial observability.
-        """
-        # process obs to get objects detected in the frame
-        if not isinstance(self.perception, PerceptionObs):
-            raise ValueError(
-                "Concept graph update mode requires PerceptionObs object for perception"
-            )
-        processed_obs = self.perception.preprocess_obs_for_non_privileged_graph_update(
-            self.sim, obs, single_agent_mode=self._single_agent_mode
-        )
-        # get frame-description from perception
-        object_detections_in_frame = (
-            self.perception.get_object_detections_for_non_privileged_graph_update(
-                processed_obs
-            )
-        )
-        # update robot's WG using object detections
-        full_state_object_dict = self.sim.object_state_machine.get_snapshot_dict(
-            self.sim
-        )
-        if object_detections_in_frame is not None:
-            self.world_graph[
-                self.robot_agent_uid
-            ].update_non_privileged_graph_with_detected_objects(
-                object_detections_in_frame,
-                object_state_dict=full_state_object_dict,
-            )
-        else:
-            raise ValueError("Frame description is None")
-        # Update the human agent from only its own observations so the GT side
-        # stays private as well.
-        most_recent_human_subgraph = self.perception.get_recent_subgraph(
-            self.sim,
-            self.get_agent_world_graph_observation_sources(self.human_agent_uid),
-            obs,
-        )
-        self.world_graph[self.conf.human_agent_uid].update(
-            most_recent_human_subgraph,
-            self.partial_obs,
-            "gt",  # human's WG is always updated in privileged mode
-        )
 
     def get_frame_description(self, obs):
         """

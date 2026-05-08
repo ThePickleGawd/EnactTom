@@ -15,7 +15,6 @@ from habitat_llm.world_model import (
     Furniture,
     Graph,
     House,
-    Human,
     Object,
     Receptacle,
     Room,
@@ -103,29 +102,17 @@ class WorldGraph(Graph):
 
         raise ValueError("World graph does not contain a node of type SpotRobot")
 
-    def get_human(self):
-        """
-        This method returns human node
-        """
-        for node in self.graph:
-            if isinstance(node, Human):
-                return node
-
-        raise ValueError("World graph does not contain a node of type Human")
-
     def get_agents(self):
         """
         This method returns all agent nodes
         """
         out = []
         for node in self.graph:
-            if isinstance(node, (Human, SpotRobot)):
+            if isinstance(node, SpotRobot):
                 out.append(node)
 
         if len(out) == 0:
-            raise ValueError(
-                "World graph does not contain a node of type Human or SpotRobot"
-            )
+            raise ValueError("World graph does not contain a SpotRobot node")
 
         return out
 
@@ -174,7 +161,7 @@ class WorldGraph(Graph):
 
     # TODO: [BE] This function is duplicated in instruct/utils.py. Should be refactored
     # to avoid duplication and maintainability issues.
-    def get_world_descr(self, is_human_wg: bool = False):
+    def get_world_descr(self, allow_unknown: bool = False):
         ## house description -- rooms and their furniture list
         furn_room = self.group_furniture_by_room()
         house_info = ""
@@ -183,43 +170,37 @@ class WorldGraph(Graph):
             all_furn = ", ".join(furn_names)
             house_info += k + ": " + all_furn + "\n"
 
-        ## get objects held by the agent
-        spot_node = self.get_spot_robot()
-        human_node = self.get_human()
-
         ## locations of objects in the house
         objs_info = ""
         all_objs = self.get_all_objects()
         for obj in all_objs:
-            if self.is_object_with_agent(obj, agent_type="robot"):
-                objs_info += obj.name + ": " + spot_node.name + "\n"
-            elif self.is_object_with_agent(obj, agent_type="human"):
-                objs_info += obj.name + ": " + human_node.name + "\n"
+            holding_agent = self.get_agent_holding_object(obj)
+            if holding_agent is not None:
+                objs_info += obj.name + ": " + holding_agent.name + "\n"
             else:
                 furniture = self.find_furniture_for_object(obj)
                 if furniture is not None:
                     objs_info += obj.name + ": " + furniture.name + "\n"
-                elif furniture is None and (
-                    (is_human_wg and self.agent_asymmetry)
-                    or (not is_human_wg and self.world_model_type == "concept_graph")
-                ):
+                elif furniture is None and allow_unknown and self.agent_asymmetry:
                     # Objects are allowed to be marooned on unknown furniture under
                     # agent asymmetry condition, since the object may be placed anywhere
-                    # in the house unbeknownst to the human agent
+                    # in the house outside this agent's current view.
                     objs_info += obj.name + ": " + "unknown" + "\n"
                 else:
                     raise ValueError(f"Object {obj.name} has no parent")
         return f"Furniture:\n{house_info}\nObjects:\n{objs_info}"
 
-    def is_object_with_human(self, obj):
+    def get_agent_holding_object(self, obj):
         """
-        This method checks if the object is connected to any agent
+        Return the agent node holding the object, if any.
         """
-        # Fetch node if input type is string
         if isinstance(obj, str):
             obj = self.get_node_from_name(obj)
 
-        return any(isinstance(neighbor, (Human)) for neighbor in self.graph[obj])
+        for neighbor in self.graph[obj]:
+            if isinstance(neighbor, SpotRobot):
+                return neighbor
+        return None
 
     def is_object_with_robot(self, obj):
         """
@@ -229,7 +210,7 @@ class WorldGraph(Graph):
         if isinstance(obj, str):
             obj = self.get_node_from_name(obj)
 
-        return any(isinstance(neighbor, (SpotRobot)) for neighbor in self.graph[obj])
+        return self.get_agent_holding_object(obj) is not None
 
     def is_object_with_agent(self, obj, agent_type="any"):
         """
@@ -238,15 +219,10 @@ class WorldGraph(Graph):
         # Fetch node if input type is string
         if isinstance(obj, str):
             obj = self.get_node_from_name(obj)
-        return_dict = {
-            "any": any(
-                isinstance(neighbor, (SpotRobot, Human)) for neighbor in self.graph[obj]
-            ),
-            "human": any(isinstance(neighbor, (Human)) for neighbor in self.graph[obj]),
-            "robot": any(
-                isinstance(neighbor, (SpotRobot)) for neighbor in self.graph[obj]
-            ),
-        }
+        held_by_agent = any(
+            isinstance(neighbor, SpotRobot) for neighbor in self.graph[obj]
+        )
+        return_dict = {"any": held_by_agent, "robot": held_by_agent}
         if agent_type in return_dict:
             return return_dict[agent_type]
         else:
@@ -403,29 +379,11 @@ class WorldGraph(Graph):
             # if operating in partial observability
             self.merge(recent_graph, add_only=add_only)
 
-        # update agent's properties if it is holding an object
-        # episode may be single-agent with robot-only; handle that
-        human_node = self.get_all_nodes_of_type(Human)
-        human_object_nodes = []
-        if human_node:
-            human_node = human_node[0]
-            human_object_nodes = self.get_neighbors_of_type(human_node, Object)
-        else:
-            human_node = None
-
-        # episode may be single-agent with human-only; handle that
-        robot_node = self.get_all_nodes_of_type(SpotRobot)
-        robot_object_nodes = []
-        if robot_node:
-            robot_node = robot_node[0]
-            robot_object_nodes = self.get_neighbors_of_type(robot_node, Object)
-        else:
-            robot_node = None
-
-        if len(human_object_nodes) > 0:
-            human_node.properties["last_held_object"] = human_object_nodes[0]
-        if len(robot_object_nodes) > 0:
-            robot_node.properties["last_held_object"] = robot_object_nodes[0]
+        # update each agent's properties if it is holding an object
+        for agent_node in self.get_all_nodes_of_type(SpotRobot) or []:
+            object_nodes = self.get_neighbors_of_type(agent_node, Object)
+            if len(object_nodes) > 0:
+                agent_node.properties["last_held_object"] = object_nodes[0]
 
         return
 
@@ -494,7 +452,7 @@ class WorldGraph(Graph):
         nodes = []
         for node in nodes_in:
             curr_node = self.get_node_from_name(node) if isinstance(node, str) else node
-            if isinstance(curr_node, (Object, Human, SpotRobot)):
+            if isinstance(curr_node, (Object, SpotRobot)):
                 if verbose:
                     self._logger.info(
                         f"Adding {curr_node.name}, {curr_node.properties['type']} to recent subgraph"

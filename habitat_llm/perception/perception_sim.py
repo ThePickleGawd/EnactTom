@@ -11,7 +11,7 @@ simulator partial-observation condition which generates ground-truth world-graph
 only the entities discovered so far by the agents."""
 
 import copy
-from typing import TYPE_CHECKING, Dict, List, Optional, Set, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Set
 
 if TYPE_CHECKING:
     pass
@@ -35,7 +35,6 @@ from habitat_llm.world_model import (
     Floor,
     Furniture,
     House,
-    Human,
     Object,
     Receptacle,
     Room,
@@ -44,7 +43,6 @@ from habitat_llm.world_model import (
 from habitat_llm.world_model.graph import Graph
 from habitat_llm.world_model.world_graph import WorldGraph, flip_edge
 
-HUMAN_SEMANTIC_ID = 100  # special semantic ID reserved for humanoids
 UNKNOWN_SEMANTIC_ID = 0  # special semantic ID reserved for unknown object class
 
 
@@ -463,13 +461,7 @@ class PerceptionSim(Perception):
             # Create properties dict
             properties = {"translation": translation, "is_articulated": True}
 
-            # Add Agent node to the world
-            agent: Union[Human, SpotRobot]
-            if agent_id == 0:
-                agent = SpotRobot(agent_name, properties, agent_id)
-            else:
-                agent = Human(agent_name, properties, agent_id)
-
+            agent = SpotRobot(agent_name, properties, agent_id)
             self.gt_graph.add_node(agent)
 
             # Add agent to the conversion dict
@@ -607,10 +599,8 @@ class PerceptionSim(Perception):
         """
         This method uses the instance segmentation output to create a list of handles of all objects present in given agent's FOV
 
-        We need different sensor naming for different modes. We follow given schema:
-        - agent_uids = ["0", "1"] to access obs from both agents in multi-agent setup
-        - agent_uids = ["0"] to access robot obs in single/multi-agent setup
-        - agent_uids = ["1"] to access human obs in multi-agent setup
+        Sensor names are namespaced by agent uid, e.g. ["0", "1"] for a
+        two-agent run.
 
         :param obs: Observation dict mapping sensor name to sensor output
         :param agent_uids: List of all agents to consider
@@ -690,7 +680,6 @@ class PerceptionSim(Perception):
             if handle in self.sim_handle_to_name:
                 names.append(self.sim_handle_to_name[handle])
 
-        # Forcefully add robot and human node names
         agent_names = [f"agent_{uid}" for uid in agent_uids]
         names.extend(agent_names)
 

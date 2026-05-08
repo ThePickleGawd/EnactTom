@@ -1,3 +1,0 @@
-defaults:
-  - centralized_evaluation_runner_multi_agent
-  - override /agent@agents.agent_0.config: nn_rearrange_agent

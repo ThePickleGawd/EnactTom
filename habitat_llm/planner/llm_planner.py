@@ -33,7 +33,6 @@ if TYPE_CHECKING:
 
     from habitat_llm.agent.agent import Agent
     from habitat_llm.agent.env import EnvironmentInterface
-    from habitat_llm.planner.rag import RAG
     from habitat_llm.world_model.world_graph import WorldGraph
 
 
@@ -70,20 +69,8 @@ class LLMPlanner(Planner):
         # Initialize container to store rollout without
         # any other material in prompt
         self.trace: str = ""
-        self.rag: Optional["RAG"] = None
 
         self.reset()
-
-        # Build RAG dataset if we want to use RAG
-        if self.enable_rag:
-            from habitat_llm.planner.rag import RAG
-
-            self.rag = RAG(
-                plan_config.example_type,
-                plan_config.rag_dataset_dir,
-                plan_config.rag_data_source_name,
-                plan_config.llm,
-            )
 
     def reset(self):
         """
@@ -109,8 +96,7 @@ class LLMPlanner(Planner):
     def build_tool_grammar(self, world_graph: "WorldGraph") -> str:
         """
         This method builds a grammar that accepts all valid tool calls based a world graph
-        The grammar is specified in the EBNF grammar description format
-        see https://github.com/epfl-dlab/transformers-CFG for details and examples
+        The grammar is specified in EBNF form for constrained generation.
 
         :param world_graph: The world graph.
         """
@@ -233,23 +219,6 @@ class LLMPlanner(Planner):
             "id": self.agents[0].uid,
         }
 
-        # We modify the prompt if we want to use RAG and the prompt has not
-        # been modified
-        if "{rag_examples}" in self.prompt:
-            if self.rag is not None:
-                _, index = self.rag.retrieve_top_k_given_query(
-                    input_instruction, top_k=1, agent_id=self._agents[0].uid
-                )
-                index = index[0]
-
-                example_str = (
-                    f"{self.planner_config.llm.user_tag}Below are some example solutions from different settings:\nExample 1:\n"
-                    + self.rag.data_dict[index]["trace"]
-                    + "\n"
-                )
-                params["rag_examples"] = example_str
-            else:
-                params["rag_examples"] = ""
         if "{tool_descriptions}" in self.prompt:
             params["tool_descriptions"] = self.agents[0].tool_descriptions
         if "{agent_descriptions}" in self.prompt:

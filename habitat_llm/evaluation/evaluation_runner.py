@@ -804,9 +804,9 @@ class EvaluationRunner:
                 and any(planner_info["replan_required"].values())
             ) or should_end:
                 planner_info["curr_graph"] = {
-                    agent_id: self.env_interface.world_graph[agent_id].get_world_descr(
-                        is_human_wg=int(agent_id) == self.env_interface.human_agent_uid
-                    )
+                    agent_id: self.env_interface.world_graph[
+                        agent_id
+                    ].get_world_descr()
                     for agent_id in range(len(self.agents))
                 }
 

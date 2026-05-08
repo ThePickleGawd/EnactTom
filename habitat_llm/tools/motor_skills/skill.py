@@ -249,8 +249,8 @@ class SkillPolicy(Policy):
         # Get entity based on the target
         entity = self.env.world_graph[self.agent_uid].get_node_from_name(target_name)
 
-        # non-privileged graph entities do not have any sim-handle; this logic handles assigning the
-        # sim-handle of closest sim-object/furniture entity to non-privileged object/furniture entity respectively
+        # Retained EnactToM runs use simulator-derived graph nodes. If a handle
+        # is missing, assign the nearest simulator entity as a fallback.
         if entity.sim_handle is None:
             # find closest entity to assign as proxy sim-handle
             # TODO: @zephirefaith :BE: is there a way to make following less brittle

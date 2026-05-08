@@ -9,7 +9,7 @@ This file contains the definition of the actiosn available to the agent.
 """
 import sys
 from dataclasses import dataclass
-from typing import Any, List, Tuple
+from typing import List, Tuple
 
 import habitat
 import habitat.sims.habitat_simulator.sim_utilities as sutils
@@ -17,26 +17,16 @@ import habitat_sim
 import magnum as mn
 import numpy as np
 from gym import spaces
-from habitat.articulated_agent_controllers import HumanoidRearrangeController
-from habitat.articulated_agents.humanoids import KinematicHumanoid
 from habitat.config.default_structured_configs import ActionConfig
 from habitat.core.registry import registry
 from habitat.core.spaces import ActionSpace
 from habitat.sims.habitat_simulator.actions import HabitatSimActions
-from habitat.sims.habitat_simulator.object_state_machine import (
-    get_state_of_obj,
-    set_state_of_obj,
-)
-from habitat.sims.habitat_simulator.sim_utilities import get_obj_from_id
-from habitat.tasks.rearrange.actions.actions import HumanoidJointAction
 from habitat.tasks.rearrange.actions.articulated_agent_action import (
     ArticulatedAgentAction,
 )
 from habitat.tasks.rearrange.rearrange_sim import RearrangeSim
 from habitat_baselines.utils.common import get_num_actions
 from hydra.core.config_store import ConfigStore
-
-from habitat_llm.utils.sim import ee_distance_to_object
 
 # Add your actions to the HabitatSimActions
 if not HabitatSimActions.has_action("oracle_pick_action"):
@@ -75,87 +65,6 @@ def find_action_range(action_space: ActionSpace, search_key: str) -> Tuple[int, 
 ############################################################
 # Define your custom actions below
 ############################################################
-@registry.register_task_action
-class HumanoidBaseVelAction(HumanoidJointAction):
-    """
-    Class to move the humanoid. Given a forward velocity and rotation computes
-    joints to move the humanoid accordingly.
-    """
-
-    def __init__(self, *args, task, **kwargs):
-        config = kwargs["config"]
-        HumanoidJointAction.__init__(self, *args, **kwargs)
-        self.humanoid_controller = self.lazy_inst_humanoid_controller(task, config)
-        self.initialized_pose = False
-        self._lin_speed = self._config.lin_speed
-        self._ang_speed = self._config.ang_speed
-
-    def lazy_inst_humanoid_controller(self, task, config):
-        # Lazy instantiation of humanoid controller
-        # We assign the task with the humanoid controller, so that multiple actions can
-        # use it.
-
-        if not hasattr(task, "humanoid_controller") or task.humanoid_controller is None:
-            # Initialize humanoid controller
-            agent_name = self._sim.habitat_config.agents_order[self._agent_index]
-            walk_pose_path = self._sim.habitat_config.agents[
-                agent_name
-            ].motion_data_path
-
-            humanoid_controller = HumanoidRearrangeController(walk_pose_path)
-
-            task.humanoid_controller = humanoid_controller
-
-        return task.humanoid_controller
-
-    def reset_controller(self):
-        if not self.initialized_pose:
-            self.humanoid_controller.reset(
-                self.cur_articulated_agent.base_transformation
-            )
-            self.initialized_pose = True
-
-    def step(self, *args, **kwargs):
-        self.reset_controller()
-        ctrl_freq = self._sim.ctrl_freq
-        lin_vel, ang_vel = kwargs[self._action_arg_prefix + "humanoid_base_vel"]
-        lin_vel = np.clip(lin_vel, -1, 1) * self._lin_speed
-        ang_vel = np.clip(ang_vel, -1, 1) * self._ang_speed
-        # for now only rotate or move forward
-
-        if lin_vel == 0 and ang_vel == 0:
-            self.humanoid_controller.calculate_stop_pose()
-        else:
-            lin_delta = lin_vel * 1.0 / ctrl_freq
-            rot_delta = ang_vel * 1.0 / ctrl_freq
-            # Move towards the target
-            self.humanoid_controller.translate_and_rotate_with_gait(
-                lin_delta, rot_delta
-            )
-        base_action = self.humanoid_controller.get_pose()
-        kwargs[f"{self._action_arg_prefix}human_joints_trans"] = base_action
-        HumanoidJointAction.step(self, *args, **kwargs)
-        return
-
-    def reset(self, *args, **kwargs):
-        super().reset()
-        self.initialized_pose = False
-
-    @property
-    def action_space(self):
-        return spaces.Dict(
-            {
-                self._action_arg_prefix
-                + "humanoid_base_vel": spaces.Box(
-                    shape=(2,),
-                    low=np.finfo(np.float32).min,
-                    high=np.finfo(np.float32).max,
-                    dtype=np.float32,
-                )
-            }
-        )
-
-
 @registry.register_task_action
 class OraclePickAction(ArticulatedAgentAction):
     """This action snaps the object specified by the object index if grip flag is true."""
@@ -508,235 +417,6 @@ class TeleportAction(ArticulatedAgentAction):
             self.cur_articulated_agent.base_pos = position_agent
             yaw = kwargs[self._action_arg_prefix + "teleport_action_yaw"]
             self.cur_articulated_agent.base_rot = yaw
-            if type(self.cur_articulated_agent) == KinematicHumanoid:
-                # Update the humanoid controller
-                self._task.humanoid_controller.reset(
-                    self.cur_articulated_agent.base_transformation
-                )
-
-
-class OracleObjectStateAction(ArticulatedAgentAction):
-    """Modifies the object state of an object
-    Requires an instance of RearrangeSim which has been initialized with an object state manager
-    (see agent/env/environment_interface.py)
-    When called, the action assigns `value` to the specified object state
-
-    """
-
-    def __init__(
-        self,
-        *args,
-        config,
-        sim: RearrangeSim,
-        action_name: str,
-        object_state: str,
-        value: Any,
-        maximum_distance: float = 1.5,
-        **kwargs,
-    ):
-        """
-
-        :param sim: The simulation environment.
-        :paraam action_name: The name of the action
-        :param object_state: The string indicating the object state to be modified.
-        :param value: The value to be assigned to the object state.
-        :param maximum_distance: The maximum distance for the agent to be able to modify the object state.
-        """
-        super().__init__(*args, config=config, sim=sim, **kwargs)
-        self._sim: RearrangeSim = sim
-        self.action_name = action_name
-        self.object_state = object_state
-        self.value = value
-        self.maximum_distance = maximum_distance
-
-    def reset(self, *args, **kwargs):
-        super().reset(*args, **kwargs)
-
-    @property
-    def action_space(self):
-        action_spaces = {
-            self._action_arg_prefix
-            + f"oracle_{self.action_name}_action": spaces.Box(
-                shape=(1,),
-                low=0,
-                high=1,
-                dtype=int,
-            ),
-            self._action_arg_prefix
-            + f"oracle_{self.action_name}_action_object_idx": spaces.Box(
-                shape=(1,),
-                low=0,
-                high=sys.maxsize,
-                dtype=int,
-            ),
-        }
-        return spaces.Dict(action_spaces)
-
-    def step(self, *args, **kwargs):
-        """
-        Performs a step in the OracleObjectStateAction.
-
-        If the action flag is not 0, sets `self.object_state` to `self.value` in the simulator for the specified object
-        if the distance from the agent to the object is within self.maximum_distance.
-        """
-        action_flag = kwargs[
-            self._action_arg_prefix + f"oracle_{self.action_name}_action"
-        ][0]
-        if action_flag != 0:
-            obj_idx = int(
-                kwargs[
-                    self._action_arg_prefix
-                    + f"oracle_{self.action_name}_action_object_idx"
-                ][0]
-            )
-            obj = get_obj_from_id(self._sim, obj_idx)
-            dist = ee_distance_to_object(
-                self._sim,
-                self._sim.agents_mgr,
-                self._agent_index,
-                obj.handle,
-                max_distance=self.maximum_distance,
-            )
-            if dist is None or dist > self.maximum_distance:
-                print(
-                    f"Agent too far from object to change {self.object_state}: Distance {dist}"
-                )
-            else:
-                set_state_of_obj(obj, self.object_state, self.value)
-
-
-@registry.register_task_action
-class OraclePowerOnAction(OracleObjectStateAction):
-    """Modifies the 'is_powered_on' object state of an object
-    Requires an instance of RearrangeSim which has been initialized with an object state manager
-    (see agent/env/environment_interface.py)
-    """
-
-    def __init__(self, *args, config, sim: RearrangeSim, **kwargs):
-        super().__init__(
-            *args,
-            config=config,
-            sim=sim,
-            action_name="power_on",
-            value=True,
-            object_state="is_powered_on",
-            **kwargs,
-        )
-
-
-@registry.register_task_action
-class OraclePowerOffAction(OracleObjectStateAction):
-    """Modifies the 'is_powered_on' object state of an object
-    Requires an instance of RearrangeSim which has been initialized with an object state manager
-    (see agent/env/environment_interface.py)
-    """
-
-    def __init__(self, *args, config, sim: RearrangeSim, **kwargs):
-        super().__init__(
-            *args,
-            config=config,
-            sim=sim,
-            action_name="power_off",
-            value=False,
-            object_state="is_powered_on",
-            **kwargs,
-        )
-
-
-@registry.register_task_action
-class OracleCleanAction(OracleObjectStateAction):
-    """Modifies the 'is_clean' object state of an object
-    Requires an instance of RearrangeSim which has been initialized with an object state manager
-    (see agent/env/environment_interface.py)
-    """
-
-    def __init__(self, *args, config, sim: RearrangeSim, **kwargs):
-        super().__init__(
-            *args,
-            config=config,
-            sim=sim,
-            action_name="clean",
-            object_state="is_clean",
-            value=True,
-            **kwargs,
-        )
-
-
-@registry.register_task_action
-class OracleFillAction(OracleObjectStateAction):
-    """Modifies the 'is_filled' object state of an object
-    Requires an instance of RearrangeSim which has been initialized with an object state manager
-    (see agent/env/environment_interface.py)
-    """
-
-    def __init__(self, *args, config, sim: RearrangeSim, **kwargs):
-        super().__init__(
-            *args,
-            config=config,
-            sim=sim,
-            action_name="fill",
-            object_state="is_filled",
-            value=True,
-            **kwargs,
-        )
-
-
-@registry.register_task_action
-class OraclePourAction(OracleObjectStateAction):
-    """Sets the 'is_filled' object state of an object to 1 of the agent is close enough to the object
-    and currently holding another object with the 'is_filled' state set to 1.
-    """
-
-    def __init__(self, *args, config, sim: RearrangeSim, **kwargs):
-        super().__init__(
-            *args,
-            config=config,
-            sim=sim,
-            action_name="pour",
-            object_state="is_filled",
-            value=True,
-            **kwargs,
-        )
-
-    def step(self, *args, **kwargs):
-        """
-        Performs a step in the OracleObjectStateAction.
-
-        If the action flag is not 0, sets `self.object_state` to `self.value` in the simulator for the specified object
-        if the distance from the agent to the object is within self.maximum_distance.
-        """
-        action_flag = kwargs[
-            self._action_arg_prefix + f"oracle_{self.action_name}_action"
-        ][0]
-        if action_flag != 0:
-            obj_idx = int(
-                kwargs[
-                    self._action_arg_prefix
-                    + f"oracle_{self.action_name}_action_object_idx"
-                ][0]
-            )
-            if not self.cur_grasp_mgr.is_grasped:
-                print("Unable to pour: Agent is not holding an object")
-                return
-            obj = sutils.get_obj_from_id(self._sim, self.cur_grasp_mgr.snap_idx)
-            if not get_state_of_obj(obj, "is_filled"):
-                print("Unable to pour: The held object is not filled")
-                return
-            obj = sutils.get_obj_from_id(self._sim, obj_idx)
-            dist = ee_distance_to_object(
-                self._sim,
-                self._sim.agents_mgr,
-                self._agent_index,
-                obj.handle,
-                max_distance=self.maximum_distance,
-            )
-            if dist is None or dist > self.maximum_distance:
-                print(
-                    f"Agent too far from object to change {self.object_state}: Distance {dist}"
-                )
-            else:
-                set_state_of_obj(obj, self.object_state, self.value)
-
 
 ############################################################
 # Define your action configs below
@@ -750,18 +430,6 @@ class TeleportActionConfig(ActionConfig):
     """
     type: str = "TeleportAction"
     name: str = "teleport"
-
-
-@dataclass
-class HumanoidBaseVelocityActionConfig(ActionConfig):
-    r"""
-    Base velocity for the humanoid.
-    """
-    type: str = "HumanoidBaseVelAction"
-    name: str = "humanoid_base_velocity"
-    num_joints: int = 54
-    lin_speed: float = 10.0
-    ang_speed: float = 10.0
 
 
 @dataclass
@@ -804,57 +472,6 @@ class OracleCloseActionConfig(ActionConfig):
     dimensionality: int = 4
 
 
-@dataclass
-class OraclePowerOnActionConfig(ActionConfig):
-    r"""
-    Action that will modify the 'is_powered_on' object state of an object to 1
-    """
-    type: str = "OraclePowerOnAction"
-    name: str = "oracle_power_on_action"
-    dimensionality: int = 2
-
-
-@dataclass
-class OraclePowerOffActionConfig(ActionConfig):
-    r"""
-    Action that will modify the 'is_powered_on' object state of an object to 0
-    """
-    type: str = "OraclePowerOffAction"
-    name: str = "oracle_power_off_action"
-    dimensionality: int = 2
-
-
-@dataclass
-class OracleCleanActionConfig(ActionConfig):
-    r"""
-    Action that will modify the 'is_clean' object state of an object to 1
-    """
-    type: str = "OracleCleanAction"
-    name: str = "oracle_clean_action"
-    dimensionality: int = 2
-
-
-@dataclass
-class OracleFillActionConfig(ActionConfig):
-    r"""
-    Action that will modify the 'is_filled' object state of an object to 1
-    """
-    type: str = "OracleFillAction"
-    name: str = "oracle_fill_action"
-    dimensionality: int = 2
-
-
-@dataclass
-class OraclePourActionConfig(ActionConfig):
-    r"""
-    Action that will modify the 'is_filled' object state of an object to 1
-    if an object is held which is already filled
-    """
-    type: str = "OraclePourAction"
-    name: str = "oracle_pour_action"
-    dimensionality: int = 2
-
-
 ############################################################
 # Register your actions below
 ############################################################
@@ -864,12 +481,7 @@ ALL_ACTIONS: List[ActionConfig] = [
     OraclePlaceActionConfig,
     OracleOpenActionConfig,
     OracleCloseActionConfig,
-    OraclePowerOnActionConfig,
-    OraclePowerOffActionConfig,
     TeleportActionConfig,
-    OracleCleanActionConfig,
-    OracleFillActionConfig,
-    OraclePourActionConfig,
 ]
 
 
@@ -900,14 +512,6 @@ def register_actions(conf):
 
 
 cs = ConfigStore.instance()
-
-cs.store(
-    package="habitat.task.actions.humanoid_base_velocity",
-    group="habitat/task/actions",
-    name="humanoid_base_velocity",
-    node=HumanoidBaseVelocityActionConfig,
-)
-
 
 cs.store(
     package="habitat.task.actions.teleport",

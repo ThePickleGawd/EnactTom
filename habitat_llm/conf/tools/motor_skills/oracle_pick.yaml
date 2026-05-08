@@ -16,5 +16,3 @@ oracle_pick:
     wait_time_for_obj_to_grasp : 10    # in steps
     thresh_for_art_state         : 0.01  # Threshold to determine whether the receptacle is closed
     grasping_distance          : 4.0   # Distance threshold of picking up the object
-
-    enable_exploration         : False # Disable exploration

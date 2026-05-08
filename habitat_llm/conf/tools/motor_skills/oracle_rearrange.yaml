@@ -17,8 +17,6 @@ oracle_rearrange:
 
     sim_freq                   : 120 # Hz
     enable_backing_up          : False
-    # Disable exploration
-    enable_exploration         : False
 
     nav_skill_config:
       name                       : 'Navigate'
@@ -33,8 +31,6 @@ oracle_rearrange:
       navmesh_offset             : [[0.0,0.0]]
       sim_freq                   : 120 # Hz
       enable_backing_up          : False
-      # Disable exploration
-      enable_exploration         : False
 
     pick_skill_config:
       name                       : 'Pick'
@@ -47,8 +43,6 @@ oracle_rearrange:
       thresh_for_art_state         : 0.01  # Threshold to determine whether the receptacle is closed
       grasping_distance          : 4.0   # Distance threshold of picking up the object
 
-      enable_exploration         : False # Disable exploration
-
 
     place_skill_config:
       name                       : 'Place'
@@ -60,5 +54,3 @@ oracle_rearrange:
       wait_time_for_obj_to_place : 10    # in steps
       placing_distance           : 2.0
       thresh_for_art_state         : 0.01  # Threshold to determine whether the receptacle is closed
-
-      enable_exploration         : False # Disable exploration

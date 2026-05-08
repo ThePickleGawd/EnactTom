@@ -2,15 +2,15 @@ from datetime import datetime
 import json
 from pathlib import Path
 
-from emtom.task_gen.external_agent import ExternalAgentLauncher
-from emtom.task_gen.prompts import build_external_taskgen_prompt
-from emtom.task_gen.runner import (
+from enacttom.task_gen.external_agent import ExternalAgentLauncher
+from enacttom.task_gen.prompts import build_external_taskgen_prompt
+from enacttom.task_gen.runner import (
     _build_run_manifest_update,
     _copy_sample,
     _write_bootstrap_files,
     build_workspace_id,
 )
-from emtom.task_gen.session import TaskGenSession, default_state
+from enacttom.task_gen.session import TaskGenSession, default_state
 
 
 def test_external_agent_launcher_builds_backend_commands(tmp_path):
@@ -47,7 +47,13 @@ def test_external_agent_launcher_builds_backend_commands(tmp_path):
     assert mini_cmd[-1] == "read the prompt"
     assert "--model" in claude_cmd and "sonnet" in claude_cmd
     assert claude_cmd[-1] == "read the prompt"
-    assert codex_cmd[:5] == ["/tmp/codex", "exec", "--sandbox", "workspace-write", "--ask-for-approval"]
+    assert codex_cmd[:5] == [
+        "/tmp/codex",
+        "exec",
+        "--dangerously-bypass-approvals-and-sandbox",
+        "--cd",
+        str(tmp_path),
+    ]
     assert "--model" in codex_cmd and "o3" in codex_cmd
 
 
@@ -122,7 +128,7 @@ def test_bootstrap_prompt_contains_full_taskgen_prompt(tmp_path):
     _write_bootstrap_files(
         working_dir=tmp_path,
         prompt_text=prompt,
-        available_items="item_a",
+        authoring_constraints="scene objects only",
         available_mechanics="room_restriction",
         available_predicates="is_open",
         action_descriptions="Navigate",
@@ -159,7 +165,7 @@ def test_build_run_manifest_update_preserves_launcher_owned_fields():
         "mode": "bulk",
         "total_workers": 24,
         "requested_tasks": 50,
-        "output_dir": "data/emtom/tasks",
+        "output_dir": "data/enacttom/tasks",
         "task_gen_agent": "mini",
         "model": "gpt-5.2",
     }
@@ -181,7 +187,7 @@ def test_build_run_manifest_update_preserves_launcher_owned_fields():
 def test_taskgen_session_finish_and_fail(tmp_path):
     state = default_state(
         working_dir=str(tmp_path),
-        output_dir="data/emtom/tasks",
+        output_dir="data/enacttom/tasks",
         num_tasks_target=2,
         agents_min=2,
         agents_max=2,

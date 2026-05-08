@@ -15,5 +15,3 @@ oracle_close:
     force_end_on_timeout       : True
 
     max_dis_interact_art       : 2.5  # slightly more tolerant to reduce flaky "too far" failures
-
-    enable_exploration         : False # whether to enable exploration

@@ -14,7 +14,7 @@ from habitat.core.registry import registry
 from habitat.core.simulator import Simulator
 from habitat.sims.habitat_simulator import sim_utilities
 
-from habitat_llm.agent.env.dataset import CollaborationEpisode
+from habitat_llm.agent.env.dataset import EnactToMEpisode
 from habitat_llm.agent.env.evaluation.evaluation_functions import (
     EvaluationProposition,
     apply_constraint_satisfaction,
@@ -82,7 +82,7 @@ class AutoEvalPropositionTracker(Measure):
         super().__init__(*args, config=config, **kwargs)
 
     def reset_metric(
-        self, *args, episode: CollaborationEpisode, task: EmbodiedTask, **kwargs
+        self, *args, episode: EnactToMEpisode, task: EmbodiedTask, **kwargs
     ):
         # precompute ao_link_map for fast predicates
         self._ao_link_map = sim_utilities.get_ao_link_id_map(self._sim)
@@ -172,7 +172,7 @@ class TaskConstraintValidation(Measure):
         super().__init__(*args, config=config, **kwargs)
 
     def reset_metric(
-        self, *args, episode: CollaborationEpisode, task: EmbodiedTask, **kwargs
+        self, *args, episode: EnactToMEpisode, task: EmbodiedTask, **kwargs
     ):
         task.measurements.check_measure_dependencies(
             self.cls_uuid, [AutoEvalPropositionTracker.cls_uuid]
@@ -234,7 +234,7 @@ class TaskPercentComplete(Measure):
 @registry.register_measure
 class TaskStateSuccess(Measure):
     """
-    True if all propositions and constraints of the collaboration task are satisfied.
+    True if all propositions and constraints of the EnactToM task are satisfied.
     """
 
     cls_uuid: str = "task_state_success"
@@ -276,7 +276,7 @@ class TaskEvaluationLog(Measure):
         super().__init__(*args, **kwargs)
 
     def reset_metric(
-        self, *args, episode: CollaborationEpisode, task: EmbodiedTask, **kwargs
+        self, *args, episode: EnactToMEpisode, task: EmbodiedTask, **kwargs
     ):
         task.measurements.check_measure_dependencies(
             self.cls_uuid, [AutoEvalPropositionTracker.cls_uuid]
@@ -320,7 +320,7 @@ class TaskExplanation(Measure):
         super().__init__(*args, **kwargs)
 
     def reset_metric(
-        self, *args, episode: CollaborationEpisode, task: EmbodiedTask, **kwargs
+        self, *args, episode: EnactToMEpisode, task: EmbodiedTask, **kwargs
     ):
         task.measurements.check_measure_dependencies(
             self.cls_uuid, [TaskEvaluationLog.cls_uuid]
@@ -330,7 +330,7 @@ class TaskExplanation(Measure):
     def update_metric(
         self,
         *args: Any,
-        episode: CollaborationEpisode,
+        episode: EnactToMEpisode,
         task: EmbodiedTask,
         **kwargs: Any,
     ):

@@ -1,101 +1,89 @@
 # Benchmark Architecture
 
-This file is the source of truth for the benchmark architecture. Keep it short and keep it current.
+This file is the source of truth for the EnactToM benchmark architecture.
 
 ## Goal
 
-EMTOM is a benchmark for embodied Theory of Mind. A task is good if success requires agents to act under asymmetric information, communicate, and reason about what other agents know.
+EnactToM measures embodied Theory of Mind. A benchmark task is valid when physical success requires agents to act under asymmetric information, communicate, and reason about what other agents know.
 
-Runtime benchmark scoring separates:
-- `functional_success`: physical and owned task completion under asymmetric information.
-- `literal_tom_probe`: end-of-episode probes derived from `K()` goals that measure whether agents can explicitly report the predicate and entities they believe are known, or abstain with `unknown`.
+Scoring keeps two signals separate:
 
-Task generation should optimize for functional ToM, not just literal ToM:
-- good tasks make success depend on adapting actions to partner-specific private information, access, incentives, or communication limits
-- weak tasks only hide a fact and ask one agent to relay it
+- `functional_success`: whether the agents physically complete the task under the benchmark information setting
+- `literal_tom_probe`: whether agents can answer end-of-episode belief probes derived from authored `K()` goals
 
-## Pipeline
+Task generation optimizes for functional ToM. Literal probes are diagnostic and must not replace the functional benchmark score.
 
-1. Explore a scene and discover useful mechanics.
-2. Select sampled task examples from the existing task pool for a target benchmark model, using an explicit logical pass/fail mix over that model's calibrated results.
-3. Generate a task grounded in the current scene and mechanics, starting from the blank task template and using the sampled examples only as inspiration.
-4. Verify the task statically and with runtime checks.
-5. Judge whether the task genuinely requires ToM reasoning.
-6. Benchmark agents on the candidate task in both `standard` and `baseline`, using `standard` for calibration and `baseline` as the full-info solvability check. For competitive tasks, `baseline` is a two-phase solo-team check: once with only `team_0` active and once with only `team_1` active.
-7. Run the submission verification layer in `standard` mode with `gpt-5.4`, `claude-sonnet-4-6`, and `gemini-flash`. The task is submission-eligible only if at least two of those three models fail.
+## Paper Pipeline
 
-Task generation runs through an external SWE-agent CLI (`mini`, `claude`, or `codex`) inside a repo-local workspace under `tmp/task_gen/`. The agent executable may come from the operator environment, but each task-generation run gets its own sandbox environment in `tmp/task_gen/<run_id>/.venv` so parallel runs stay isolated. The repo provides the prompt, sampled seed context, and a stable `taskgen` command surface for `new_scene`, `judge`, `verify_golden_trajectory`, `test_task`, `submit_task`, and `finish`.
+The retained pipeline is:
 
-`tmp/task_gen/` is workspace-only. All generation logs and visualizer-facing artifacts live under `outputs/generations/<run_id>/`, including the run manifest, per-worker status snapshots, normalized EMTOM event logs, backend-native agent traces such as `agent_trace.json`, internal API-usage ledgers such as `api_usage.jsonl`, and any bulk-launcher stdout logs. The visualizer and post-run summaries should treat those artifacts as the source of truth for per-model API call counts and generation cost accounting; they do not rely on a generated generation-data snapshot.
+1. Load a Habitat scene with `new_scene`.
+2. Select sampled seed tasks from the existing pool using calibrated pass/fail outcomes for the target model.
+3. Author a cooperative or mixed task grounded in that scene.
+4. Validate the task JSON and PDDL goal.
+5. Verify the golden trajectory in Habitat.
+6. Judge whether the task genuinely requires ToM reasoning.
+7. Run the empirical `test_task` gate, including standard-mode failure and baseline solvability calibration.
+8. Submit accepted tasks.
+9. Benchmark agents on the accepted task set.
 
-There is no separate evolution pipeline. Difficulty shaping happens inside normal task generation:
-- the sampled-task selector uses target-model calibration data and an explicit pass/fail mix, drawing 30 sampled tasks by default: 80% failed examples and 20% passed examples in standard generation, and 90% failed examples plus 10% passed examples in hard generation
-- default category selection for routine generation samples only `cooperative` and `mixed`; `competitive` generation must be explicitly requested
-- `new_scene` always creates `working_task.json` from the blank template with the requested number of agents
-- sampled examples are inspiration only; they are not loaded directly into the authored task
+Bulk task generation is native to `./enacttom/run_enacttom.sh generate --bulk`. Bulk workers still run the same one-task generation path; the launcher only assigns worker IDs, GPU slots, categories, and shared run/output directories.
 
-## Campaigns
+There is no separate campaign, migration, salvage, reinforcement-learning, or evolution pipeline. Difficulty shaping is part of normal generation:
 
-- Keep exactly one active benchmark campaign in `data/emtom/results/`.
-- When benchmark semantics change enough to invalidate comparability, archive the active campaign into `data/emtom/results/archives/<campaign_id>/` before starting a new one.
-- The visualizer should expose both the active campaign and archived campaigns, but never merge their leaderboards.
-- Campaign reporting must keep `pass_rate` and `literal_tom_score` separate. They answer different questions and should be shown side by side, not collapsed into one metric.
-- `benchmark` and `benchmark-suite` may repeat the same evaluation `num_times`; when `num_times > 1`, those repeats run in parallel and the report must include mean pass rate, pass-rate standard deviation, `pass@k`, and `pass^k` with `k = num_times`.
-- Repeated-run reliability metrics must use the exact article formulas: `pass@k = 1 - C(n-c, k) / C(n, k)` and `pass^k = (c/n)^k`. In EMTOM repeated benchmarks, `n` is the requested repeated-run count per task, `c` is the number of successful benchmark runs for that task, and benchmark attempts that fail before producing task results count toward `n` with zero contribution to `c`.
+- `standard` generation targets a 10% pass rate for the target model
+- `hard` generation caps target-model pass rate at 5%
+- seed examples are sampled with mostly target-model failures and a small number of passes
+- sampled examples are inspiration only and are never copied directly into a new task
+
+## Categories
+
+Paper reproduction uses only:
+
+- `cooperative`
+- `mixed`
+
+Competitive task generation and competitive team-vs-team benchmarking are out of scope for the minimal paper code path.
+
+## Agent Counts
+
+Paper reproduction uses the retained 2-, 3-, and 4-agent Habitat presets. All retained presets use Spot robots with the same paper benchmark action surface: `Navigate`, `Pick`, `Place`, `Open`, `Close`, `Communicate`, `Wait`, and the scene lookup tools.
+
+## Mechanics
+
+Task authoring supports exactly these mechanics:
+
+- `room_restriction`
+- `limited_bandwidth`
+- `restricted_communication`
+- `remote_control`
+- `state_mirroring`
+- `inverse_state`
+
+Task-added item schemas, locked-container key logic, stun actions, and legacy one-off mechanics are out of scope.
 
 ## Benchmark Modes
 
-- `standard`: task secrets are private and agents only observe normal benchmark channels.
-- `baseline`: all task secrets are shared with all agents, and agents may read other agents' completed Thought+Action trajectories through a runtime benchmark tool.
-- `full_info`: all task secrets are shared with all agents, and agents may read other agents' completed Observation+Thought+Action trajectories through a runtime benchmark tool.
-- For competitive `test_task` runs, `baseline` is evaluated in two full-info phases: `team_0_only` and `team_1_only`. Both phases must succeed for the baseline gate to pass.
-- `standard` must run with partial observability and per-agent asymmetric world graphs.
-- `baseline` and `full_info` must run with full observability and shared world-state visibility. Their purpose is to remove information bottlenecks, not preserve them.
-- Under partial observability, each agent's world graph must be private: only that agent's own observations may add or update entities. Communication may inform planning, but it must not directly mutate the recipient's world graph.
-- Under the original PARTNR partial-observability setting, each agent starts with the static house layout only: rooms, floors, furniture, and receptacles are known up front, but movable objects are absent until that agent personally observes them.
-- Prompt rendering should show newly observed movable objects by their exact runtime handles in the agent's private known-world view.
+- `standard`: task secrets remain private, partial observability is enabled, and agents only observe through normal benchmark channels
+- `baseline`: task secrets are shared and the information bottleneck is removed to check whether the task is solvable when ToM pressure is relaxed
 
-## Task Generation Gates
-
-- `verify_golden_trajectory` remains the canonical deterministic solvability gate. It proves the authored task spec is functionally solvable under the planner/runtime semantics.
-- Judge-time ToM evidence must come from the strict Fast Downward proof path. Structural or syntactic fallback metadata is not valid submission evidence.
-- `test_task` now runs `standard` plus a `baseline` solvability check. For competitive tasks, that baseline check consists of two solo-team runs, one for each side.
-- `verify_task` is a separate pre-submit gate. It runs `gpt-5.4`, `claude-sonnet-4-6`, and `gemini-flash` in `standard` mode and requires at least two failures before submission.
-- Dataset difficulty calibration uses the `standard` result only, with a target pass rate of 10% by default for the current target model. Hard generation uses a hard standard-mode pass-rate cap of 5%; anything below 5% is acceptable, and candidate tasks that would push the calibrated pool above 5% must be rejected. Hard generation also requires `standard` progress to stay below 45%; tasks at 45% or higher are too easy and must be rejected even if they technically fail.
-- Calibration and sampled-task selection ignore `tom_level = 0` tasks. New submissions with `tom_level < 1` must be rejected.
-- The `test_task` acceptance gate should use the current calibrated pass/fail counts. Standard generation may continue using target-tracking, but hard generation must enforce both the 5% max-pass-rate cap and the `<45%` `standard`-progress requirement. Any candidate task whose kept `standard` outcome would exceed the pass-rate cap or reach 45% progress must be rejected.
-- `baseline` does not replace the planner/golden-trajectory check; it is an additional empirical check that the task becomes solvable when private information is removed.
-- Submitted benchmark tasks must stay grounded in a real dataset `scene_id` and `episode_id`. Synthetic fallback scenes are allowed for lightweight authoring environments, but they must be rejected before submission and benchmark runs.
+Functional success ignores `K()` and evaluates the projected non-epistemic goal. PDDL solvability, deterministic planning, and golden-trajectory verification solve the same functional goal.
 
 ## Code Ownership
 
-- `emtom/pddl/`: goal language, runtime goal projection, epistemic compilation, and solvability checks.
-- `emtom/task_gen/`: seed selection, task generation, validation, calibration, and submission gates.
-- `emtom/runner/`: execution in the environment.
-- `emtom/cli/`: stable command surfaces for operators and agents.
-- `README.md`: brief setup and command entrypoints.
-- `docs/*.md`: conceptual design and architecture. This is the single source of truth.
+- `enacttom/pddl/`: goal language, epistemic compilation, and solvability checks
+- `enacttom/task_gen/`: task authoring surface, seed selection, validation, judging, calibration, and submission gates
+- `enacttom/runner/`: Habitat execution runtime
+- `enacttom/cli/`: stable command surfaces used by `./enacttom/run_enacttom.sh` and external authoring agents
+- `docs/*.md`: conceptual behavior and architecture
 
-## Design Rules
+## Invariants
 
-- Keep one clear implementation path.
-- Prefer direct data flow over hidden coupling.
-- Treat verification as a hard gate, not a warning system.
-- Task authoring currently supports only these mechanics: `room_restriction`, `limited_bandwidth`, `restricted_communication`, `remote_control`, `state_mirroring`, and `inverse_state`.
-- Task-generation prompts should encourage diverse use of all six supported mechanics and should not overfit to the historically dominant room/access stack.
-- Task-added items are temporarily hidden from authoring. Do not rely on `items`, `locked_containers`, or `UseItem` in newly generated benchmark tasks.
+- Keep `./enacttom/run_enacttom.sh` as the main entry point.
+- Keep one clear implementation path for each paper flow.
 - Keep `problem_pddl` as the single authored source of epistemic structure and goals.
-- Generate `problem_pddl :objects` and `:init` deterministically from the loaded scene snapshot and mechanic bindings instead of hand-authoring scene state.
-- Keep benchmark mechanics authored once in `mechanic_bindings`; derive all planner-only mechanic init facts from those bindings instead of duplicating them in `problem_pddl`.
-- Keep the public `task` high-level and non-leaking; use exact scene IDs in `agent_secrets` and `team_secrets` only for goal-critical facts that the agent actually knows or observed.
-- `agent_secrets` should contain positive private facts, constraints, and private objectives only. Do not add ignorance lines like 'you do not know ...', self-intro boilerplate, or epistemic coaching like 'By the end, you must be confident ...'.
-- When an object's identity or location is the hidden fact, do not name its exact runtime object ID in the public `task` or in any secret for an agent who does not already know that fact. Reserve exact IDs for the agents who actually know or observed that fact, plus `problem_pddl`.
-- Runtime task success ignores `K()` and uses the projected non-epistemic goal only.
-- `verify-pddl`, deterministic planning, and golden trajectory verification all solve the same projected non-epistemic functional goal.
-- Authored placement goals must use `is_on_top` only with non-articulated support surfaces. For articulated/container furniture such as cabinets, drawers, fridges, safes, and wardrobes, use `is_inside` when containment is intended. Validation rejects articulated `is_on_top` goals because planner translation and runtime success semantics do not agree on them.
-- Mechanic predicates such as `is_inverse`, `controls*`, `mirrors*`, `requires_item`, `unlocks`, `is_restricted`, and communication wiring are init-only support facts. They must never appear in `pddl_goal`, including inside `K()`.
-- The deterministic planner is the canonical mechanic implementation path. Runtime handlers and compiled planner facts must agree on mechanic semantics.
-- End-of-episode literal ToM probes are derived deterministically from `K()` formulas and reported separately from task success.
-- Benchmark `percent_complete` should track the same success-relevant functional scope; mixed tasks may expose separate all-goal progress for diagnostics.
-- Golden trajectories are physical-only and do not include epistemic-only communication steps.
+- Generate scene objects and mechanic init facts deterministically from the loaded scene snapshot and `mechanic_bindings`.
+- Keep public task text non-leaking; exact hidden object IDs belong only in private secrets and PDDL.
+- Runtime handlers and planner compilation must agree on mechanic semantics.
+- End-of-episode literal-ToM probes are derived deterministically from `K()` formulas and reported separately from physical success.
 - Update this file whenever the benchmark structure or invariants change.

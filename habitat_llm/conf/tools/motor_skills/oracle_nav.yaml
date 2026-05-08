@@ -18,5 +18,3 @@ oracle_nav:
     turn_velocity              : 50.0
     sim_freq                   : 120 # Hz
     enable_backing_up          : False
-    # Disable exploration
-    enable_exploration         : False

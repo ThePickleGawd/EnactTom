@@ -1,5 +1,0 @@
-# @package _global_
-
-defaults:
-  - /examples/centralized_full_obs
-  - override /planner@evaluation.planner: random_rearrange_planner

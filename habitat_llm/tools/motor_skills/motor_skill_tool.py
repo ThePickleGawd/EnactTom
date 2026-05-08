@@ -14,8 +14,6 @@ from torch import nn
 
 from habitat_llm.tools import Tool
 
-# from habitat_llm.tools.motor_skills.reset_arm.reset_arm_skill import ResetArmSkill
-
 
 class MotorSkillTool(Tool):
     def __init__(self, skill_config):
@@ -70,13 +68,6 @@ class MotorSkillTool(Tool):
             if self.habitat_baselines_conf.rl.ddppo.reset_critic:
                 nn.init.orthogonal_(skill.actor_critic.critic.fc.weight)
                 nn.init.constant_(skill.actor_critic.critic.fc.bias, 0)
-
-        # # Some skills require an arm reset before execution (pick, place)
-        # if "reset_arm" in self.skill_config:
-        #     self.reset = ResetArmSkill(
-        #         self.skill_config.reset_arm, self.env.orig_action_space, 1
-        #     )
-        #     self.reset.to(self.env.device)
 
         # Instantiate hidden states
         skill.recurrent_hidden_states = torch.zeros(

@@ -12,7 +12,7 @@ from urllib import error, request
 
 from omegaconf import DictConfig
 
-from emtom.api_costs import maybe_append_usage_event
+from enacttom.api_costs import maybe_append_usage_event
 from habitat_llm.llm.base_llm import BaseLLM, LLMRequestError, Prompt
 
 # Load .env file if it exists (for API keys)

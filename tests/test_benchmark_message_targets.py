@@ -1,4 +1,4 @@
-from emtom.runner.benchmark import BenchmarkRunner
+from enacttom.runner.benchmark import BenchmarkRunner
 
 
 class _Binding:

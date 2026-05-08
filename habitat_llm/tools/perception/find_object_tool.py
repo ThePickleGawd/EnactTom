@@ -20,7 +20,7 @@ import numpy as np
 
 from habitat_llm.tools import PerceptionTool, get_prompt
 from habitat_llm.utils.grammar import FREE_TEXT
-from habitat_llm.world_model import Furniture, Human, Receptacle, Room, SpotRobot
+from habitat_llm.world_model import Furniture, Receptacle, Room, SpotRobot
 
 
 class FindObjectTool(PerceptionTool):
@@ -92,7 +92,7 @@ class FindObjectTool(PerceptionTool):
             # find out if this object has a container attached to it
             container = self.env_interface.world_graph[
                 self.agent_uid
-            ].get_neighbors_of_type(obj, (Furniture, SpotRobot, Human, Receptacle))
+            ].get_neighbors_of_type(obj, (Furniture, SpotRobot, Receptacle))
 
             rooms_path = self.env_interface.world_graph[self.agent_uid].find_path(
                 root_node=obj, end_node_types=[Room]

@@ -82,7 +82,7 @@ def fix_config(cfg, root: bool = True) -> None:
 
 def setup_config(config: DictConfig = None, seed: int = 47668090) -> DictConfig:
     """
-    Setups the random seed and the wandb logger.
+    Set up the random seed and normalize the Habitat config.
     """
 
     # Exit if config is not provided
@@ -113,18 +113,11 @@ def setup_config(config: DictConfig = None, seed: int = 47668090) -> DictConfig:
             config.habitat.simulator.agents.keys()
         )
 
-        # Add the wandb information to the habitat config
-        if "WANDB" in config:
-            config.habitat_baselines.wb.project_name = config.WANDB.project
-            config.habitat_baselines.wb.run_name = config.WANDB.name
-            config.habitat_baselines.wb.group = config.WANDB.group
-            config.habitat_baselines.wb.entity = config.WANDB.entity
-
         # Propagate the metadata folder config to the simulator
         config_dict = OmegaConf.create(
             OmegaConf.to_container(config.habitat, resolve=True)
         )
-        # TODO: refactor this. We shouldn't need to copy configs into other subconfigs to pass information. This is done now because CollaborationSim needs metadata paths for init.
+        # TODO: refactor this. We shouldn't need to copy configs into other subconfigs to pass information. This is done now because EnactToMSim needs metadata paths for init.
         config_dict.simulator.metadata = config.habitat.dataset.metadata
         config.habitat = config_dict
 

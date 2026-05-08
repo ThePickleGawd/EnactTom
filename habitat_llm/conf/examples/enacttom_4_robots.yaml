@@ -1,0 +1,80 @@
+# @package _global_
+
+# EnactToM 4-robot preset (all embodied as Spot robots)
+defaults:
+  - /training@             : base_train
+  - /habitat_conf          : enacttom_spot_multi_agent_4
+  - /habitat_conf/task     : rearrange_easy_multi_agent_4
+  - /evaluation: decentralized_evaluation_runner_4_agent_openai
+  - /world_model@world_model: gt_graph
+  - /trajectory@trajectory : trajectory_logger
+  - /agent/@agents.agent_0.config: oracle_rearrange_agent
+  - /agent/@agents.agent_1.config: oracle_rearrange_agent
+  - /agent/@agents.agent_2.config: oracle_rearrange_agent
+  - /agent/@agents.agent_3.config: oracle_rearrange_agent
+  # Planners for all agents come from decentralized_evaluation_runner_4_agent_openai
+  - override /hydra/output : output
+  # Override planner instruct to use EnactToM-specific prompts
+  - override /instruct@evaluation.agents.agent_0.planner.plan_config.instruct: enacttom_no_visual
+  - override /instruct@evaluation.agents.agent_1.planner.plan_config.instruct: enacttom_no_visual
+  - override /instruct@evaluation.agents.agent_2.planner.plan_config.instruct: enacttom_no_visual
+  - override /instruct@evaluation.agents.agent_3.planner.plan_config.instruct: enacttom_no_visual
+  - _self_
+
+world_model:
+  partial_obs: False
+agent_asymmetry: False
+trajectory:
+  agent_names: [agent_0, agent_1, agent_2, agent_3]
+  camera_prefixes: [articulated_agent_jaw, articulated_agent_jaw, articulated_agent_jaw, articulated_agent_jaw]
+
+device      : cuda
+instruction : ''
+mode: "dataset"
+env: habitat
+num_runs_per_episode: 1
+num_proc: 1
+dry_run: False
+
+agents:
+  agent_0:
+    uid: 0
+  agent_1:
+    uid: 1
+  agent_2:
+    uid: 2
+  agent_3:
+    uid: 3
+
+paths:
+  results_dir: ${hydra:runtime.output_dir}/results
+  epi_result_file_path: "${paths.results_dir}/episode_result_log.csv"
+  run_result_file_path: "${paths.results_dir}/run_result_log.csv}"
+  end_result_file_path: "${paths.results_dir}/end_result_log.csv}"
+
+evaluation:
+  do_print: True
+  save_video: True
+  log_data: True
+  save_rgb: False
+  log_detailed_traces: True
+  agents:
+    agent_0:
+      uid: 0
+    agent_1:
+      uid: 1
+    agent_2:
+      uid: 2
+    agent_3:
+      uid: 3
+
+habitat:
+  task:
+    pddl_domain_def: fp
+
+hydra:
+  job:
+    name: 'enacttom_4_robots'
+    chdir: False
+  run:
+    dir: outputs/${hydra.job.name}/${now:%Y-%m-%d_%H-%M-%S}-${file_stem:${habitat.dataset.data_path}}

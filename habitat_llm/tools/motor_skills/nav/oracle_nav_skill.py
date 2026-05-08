@@ -46,11 +46,7 @@ class OracleNavSkill(SkillPolicy):
             agent_uid=agent_uid,
         )
         self.env = env
-        # TODO: there may be cleaner ways to do this
-        if f"agent_{self.agent_uid}_humanoidjoint_action" in action_space.spaces:
-            self.motion_type = "human_joints"
-        else:
-            self.motion_type = "base_velocity"
+        self.motion_type = "base_velocity"
 
         # pre-computed target pose for the ArticulatedAgent. See set_target.
         self.target_base_pos: mn.Vector3 = None
@@ -93,14 +89,9 @@ class OracleNavSkill(SkillPolicy):
 
         else:
             # Get indices for linear and angular velocities in the action tensor
-            if self.motion_type != "human_joints":
-                self.action_range = find_action_range(
-                    self.action_space, f"agent_{self.agent_uid}_base_velocity"
-                )
-            else:
-                self.action_range = find_action_range(
-                    self.action_space, f"agent_{self.agent_uid}_humanoid_base_velocity"
-                )
+            self.action_range = find_action_range(
+                self.action_space, f"agent_{self.agent_uid}_base_velocity"
+            )
             self.linear_velocity_index = self.action_range[0]
             self.angular_velocity_index = self.action_range[1] - 1
 

@@ -6,8 +6,6 @@
 
 from typing import TYPE_CHECKING, Any, Dict, List, Tuple
 
-from omegaconf import DictConfig
-
 if TYPE_CHECKING:
     from habitat_llm.agent import Agent
     from habitat_llm.agent.env import EnvironmentInterface
@@ -30,11 +28,6 @@ class Planner:
         self.env_interface: "EnvironmentInterface" = env_interface
         self._agents: List["Agent"] = []
         self.is_done: bool = False
-        self.enable_rag: bool = (
-            plan_config.get("enable_rag", False)
-            if isinstance(plan_config, DictConfig)
-            else False
-        )
         self.swap_instruction: bool = True
         self.last_high_level_actions: Dict[int, Tuple[str, str, str]] = {}
 
@@ -237,56 +230,26 @@ class Planner:
                 elif agent_uid in responses:
                     action_and_args = self.last_high_level_actions[agent_uid]
                     action_results = responses[agent_uid]
-                int_other_agent_uid = 1 - int_agent_uid
                 # update own and other's world-graph
                 # -----------------------
-                if (
-                    self.env_interface.conf.world_model.type == "concept_graph"
-                    and agent_uid == self.env_interface.robot_agent_uid
-                ):
-                    self.env_interface.world_graph[
-                        int_agent_uid
-                    ].update_non_privileged_graph_by_action(
-                        agent_uid,
-                        action_and_args,
-                        action_results,
-                    )
-                else:
-                    self.env_interface.world_graph[int_agent_uid].update_by_action(
-                        agent_uid,
-                        action_and_args,
-                        action_results,
-                    )
+                self.env_interface.world_graph[int_agent_uid].update_by_action(
+                    agent_uid,
+                    action_and_args,
+                    action_results,
+                )
 
                 # In full-observability settings we may mirror successful actions
                 # into the teammate graph. Under partial observability this is
                 # disabled so each agent learns state changes only through its own
                 # later observations.
-                if self._should_update_other_agent_world_graphs() and (
-                    (
-                        self.env_interface.conf.agent_asymmetry
-                        and int_agent_uid == self.env_interface.human_agent_uid
-                    )
-                    or (not self.env_interface.conf.agent_asymmetry)
-                ):
-                    # only update robot's WG with other agent's actions
-                    # OR
-                    # add action based updates irrespective of agent types
-                    if (
-                        self.env_interface.conf.world_model.type == "concept_graph"
-                        and int_other_agent_uid == self.env_interface.robot_agent_uid
-                    ):
-                        self.env_interface.world_graph[
-                            int_other_agent_uid
-                        ].update_non_privileged_graph_by_other_agent_action(
-                            agent_uid,
-                            action_and_args,
-                            action_results,
-                        )
-                    else:
-                        self.env_interface.world_graph[
-                            int_other_agent_uid
-                        ].update_by_other_agent_action(
+                if self._should_update_other_agent_world_graphs():
+                    for (
+                        int_other_agent_uid,
+                        graph,
+                    ) in self.env_interface.world_graph.items():
+                        if int_other_agent_uid == int_agent_uid:
+                            continue
+                        graph.update_by_other_agent_action(
                             agent_uid,
                             action_and_args,
                             action_results,

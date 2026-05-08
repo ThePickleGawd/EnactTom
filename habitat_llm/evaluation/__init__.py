@@ -3,9 +3,6 @@
 # LICENSE file in the root directory of this source tree.
 
 from habitat_llm.evaluation.evaluation_runner import EvaluationRunner  # isort:skip
-from habitat_llm.evaluation.centralized_evaluation_runner import (  # isort:skip
-    CentralizedEvaluationRunner,
-)
 from habitat_llm.evaluation.decentralized_evaluation_runner import (  # isort:skip
     DecentralizedEvaluationRunner,
 )

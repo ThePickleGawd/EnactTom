@@ -19,7 +19,7 @@ from habitat.sims.habitat_simulator.sim_utilities import (
 from habitat_sim.physics import ManagedArticulatedObject, ManagedRigidObject
 from habitat_sim.scene import SemanticRegion
 
-from habitat_llm.sims.collaboration_sim import CollaborationSim
+from habitat_llm.sims.enacttom_sim import EnactToMSim
 
 
 @dataclass
@@ -36,7 +36,7 @@ class SimBasedPredicates:
 
     @staticmethod
     def sim_instance_from_handle(
-        sim: CollaborationSim, handle: str
+        sim: EnactToMSim, handle: str
     ) -> Union[ManagedRigidObject, ManagedArticulatedObject]:
         """map handle to object/receptacle as managed by the AOM or ROM."""
         sim_instance = get_obj_from_handle(sim, handle)
@@ -47,7 +47,7 @@ class SimBasedPredicates:
         return sim_instance
 
     @staticmethod
-    def sim_region_from_id(sim: CollaborationSim, region_id: str) -> SemanticRegion:
+    def sim_region_from_id(sim: EnactToMSim, region_id: str) -> SemanticRegion:
         """Map the handle of a region to the SemanticRegion in Habitat Sim"""
         for region in sim.semantic_scene.regions:
             if region.id == region_id:
@@ -56,7 +56,7 @@ class SimBasedPredicates:
 
     @staticmethod
     def get_state_snapshot_if_none(
-        sim: CollaborationSim, snapshot_dict: Optional[Dict[str, Dict[str, Any]]] = None
+        sim: EnactToMSim, snapshot_dict: Optional[Dict[str, Dict[str, Any]]] = None
     ) -> Dict[str, Dict[str, Any]]:
         if snapshot_dict is not None:
             return snapshot_dict
@@ -66,7 +66,7 @@ class SimBasedPredicates:
     def set_predicate(
         cls,
         predicate_fn: Callable[..., PropositionResult],
-        sim: CollaborationSim,
+        sim: EnactToMSim,
         entity_handles_a: List[str],
         entity_handles_b: Optional[List[Union[str, None]]] = None,
         number: int = 1,
@@ -138,7 +138,7 @@ class SimBasedPredicates:
     @classmethod
     def is_on_top(
         cls,
-        sim: CollaborationSim,
+        sim: EnactToMSim,
         object_handles: List[str],
         receptacle_handles: List[str],
         number: int = 1,
@@ -178,7 +178,7 @@ class SimBasedPredicates:
     @classmethod
     def is_inside(
         cls,
-        sim: CollaborationSim,
+        sim: EnactToMSim,
         object_handles: List[str],
         receptacle_handles: List[str],
         number: int = 1,
@@ -218,7 +218,7 @@ class SimBasedPredicates:
     @classmethod
     def is_in_room(
         cls,
-        sim: CollaborationSim,
+        sim: EnactToMSim,
         object_handles: List[str],
         room_ids: List[str],
         number: int = 1,
@@ -255,7 +255,7 @@ class SimBasedPredicates:
     @classmethod
     def is_on_floor(
         cls,
-        sim: CollaborationSim,
+        sim: EnactToMSim,
         object_handles: List[str],
         number: int = 1,
         ao_link_map: Optional[Dict[int, int]] = None,
@@ -287,7 +287,7 @@ class SimBasedPredicates:
     @classmethod
     def is_next_to(
         cls,
-        sim: CollaborationSim,
+        sim: EnactToMSim,
         entity_handles_a: List[str],
         entity_handles_b: List[str],
         number: int = 1,
@@ -334,7 +334,7 @@ class SimBasedPredicates:
     def is_clustered(
         cls,
         *args: List[str],
-        sim: CollaborationSim,
+        sim: EnactToMSim,
         number: List[int] = None,
         l2_threshold: float = 0.5,
         ao_link_map: Optional[Dict[int, int]] = None,
@@ -406,7 +406,7 @@ class SimBasedPredicates:
     def boolean_object_state_predicate(
         cls,
         object_state_name: str,
-        sim: CollaborationSim,
+        sim: EnactToMSim,
         object_handles: List[str],
         number: int = 1,
         object_states_dict: Optional[Dict[str, Dict[str, Any]]] = None,

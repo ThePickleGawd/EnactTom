@@ -7,7 +7,6 @@ from habitat_llm.world_model.entities.furniture import Furniture
 from habitat_llm.world_model.entity import (
     Entity,
     House,
-    Human,
     Object,
     Receptacle,
     Room,

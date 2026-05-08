@@ -1,7 +1,0 @@
-defaults:
-  - /tools/motor_skills@tools.motor_skills:
-    - wait
-  - /tools/perception@tools.perception:
-    - communication_tool
-
-env: habitat

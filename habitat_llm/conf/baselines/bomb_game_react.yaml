@@ -1,7 +1,0 @@
-# @package _global_
-
-defaults:
-  - decentralized_react_baseline
-
-# Game-specific tweaks can go here; keep the rest inherited from the baseline.
-instruction: "Play the bomb defusal game. Coordinate to find and defuse the bomb."

@@ -7,7 +7,6 @@ defaults:
     - oracle_open
     - oracle_close
     - oracle_rearrange
-    - oracle_explore
     - wait
   - /tools/perception@tools.perception:
     - find_receptacle_tool

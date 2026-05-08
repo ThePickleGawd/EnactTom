@@ -16,5 +16,3 @@ oracle_place:
     wait_time_for_obj_to_place : 10    # in steps
     placing_distance           : 2.5  # slightly more tolerant to reduce flaky "not close enough" failures
     thresh_for_art_state         : 0.01  # Threshold to determine whether the receptacle is closed
-
-    enable_exploration         : False # Disable exploration

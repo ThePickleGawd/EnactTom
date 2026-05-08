@@ -5,13 +5,10 @@ repos:
     rev: v4.2.0
     hooks:
     - id: trailing-whitespace
-      exclude: dataset_generation/benchmark_generation/prompts_benchmark/eval_gen_prompts/
     - id: check-added-large-files
       args: ['--maxkb=2000']
     - id: end-of-file-fixer
-      exclude: dataset_generation/benchmark_generation/prompts_benchmark/eval_gen_prompts/
     - id: debug-statements
-      exclude: habitat_llm/examples/
     - id: check-case-conflict
     - id: check-docstring-first
     - id: check-executables-have-shebangs
@@ -36,17 +33,11 @@ repos:
     hooks:
       - id: isort
         args: ["--profile", "black", "--filter-files"]
-        exclude: |
-            (?x)^(
-                third_party/
-                | outputs-lab/
-            )
 
   - repo: https://github.com/ambv/black
     rev: 23.1.0
     hooks:
     - id: black
-      exclude: third_party/|outputs_black/
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
@@ -54,20 +45,18 @@ repos:
     hooks:
       - id: ruff
         args: [--fix]
-        exclude: ^third_party/
 
   - repo: https://github.com/myint/autoflake
     rev: v1.4
     hooks:
     - id: autoflake
       args: ["--expand-star-imports", "--ignore-init-module-imports", "--in-place"]
-      exclude: third_party
 
   - repo: https://github.com/pycqa/flake8
     rev: 4.0.1
     hooks:
       - id: flake8
-        exclude: third_party|outputs
+        exclude: outputs/
         additional_dependencies:
         - flake8-bugbear==22.4.25
         - flake8-builtins==1.5.3
@@ -80,8 +69,3 @@ repos:
     hooks:
       - id: mypy
         args: [--install-types, --non-interactive, --no-strict-optional, --ignore-missing-imports]
-        exclude: |
-            (?x)^(
-                third_party/
-                | outputs-lab/
-            )

@@ -27,8 +27,8 @@ if TYPE_CHECKING:
 
 
 @attr.s(auto_attribs=True, kw_only=True)
-class CollaborationEpisode(RearrangeEpisode):
-    """Specifies additional instruction and evaluation data for a particular instance of a collaboration task.
+class EnactToMEpisode(RearrangeEpisode):
+    """Additional instruction and evaluation data for one EnactToM task.
 
     For a definition of inherited keys, see RearrangeEpisode.
 
@@ -52,14 +52,14 @@ class CollaborationEpisode(RearrangeEpisode):
     object_states: Dict[str, Dict[str, Any]] = attr.ib(factory=dict)
 
 
-@registry.register_dataset(name="CollaborationDataset-v0")
-class CollaborationDatasetV0(RearrangeDatasetV0):
-    episodes: List[CollaborationEpisode]
+@registry.register_dataset(name="EnactToMDataset-v0")
+class EnactToMDatasetV0(RearrangeDatasetV0):
+    episodes: List[EnactToMEpisode]
 
     def __init__(
         self,
         config: Optional["DictConfig"] = None,
-        episodes: List[CollaborationEpisode] = None,
+        episodes: List[EnactToMEpisode] = None,
     ) -> None:
         self.config = config
         if episodes is not None:
@@ -72,15 +72,15 @@ class CollaborationDatasetV0(RearrangeDatasetV0):
                 data_p = config.data_path.format(split=config.split)
                 scenes_p = config.scenes_dir
                 raise ValueError(
-                    f"Collaboration task assets are not downloaded locally. Either {data_p} or {scenes_p} do not exist."
+                    f"EnactToM task assets are not downloaded locally. Either {data_p} or {scenes_p} do not exist."
                 )
 
             check_and_gen_physics_config()
             super(RearrangeDatasetV0, self).__init__(config)
 
     def apply_scene_dir_prefix(
-        self, episode: CollaborationEpisode, scenes_dir: Optional[str] = None
-    ) -> CollaborationEpisode:
+        self, episode: EnactToMEpisode, scenes_dir: Optional[str] = None
+    ) -> EnactToMEpisode:
         """Overrides the scene directory to `scene_dataset_config` if provided."""
         if not scenes_dir:
             return episode
@@ -103,30 +103,30 @@ class CollaborationDatasetV0(RearrangeDatasetV0):
         deserialized = json.loads(json_str)
 
         for episode in deserialized["episodes"]:
-            collaboration_ep = CollaborationEpisode(**episode)
+            enacttom_ep = EnactToMEpisode(**episode)
 
-            for i, prop in enumerate(collaboration_ep.evaluation_propositions):
-                collaboration_ep.evaluation_propositions[i] = EvaluationProposition(
+            for i, prop in enumerate(enacttom_ep.evaluation_propositions):
+                enacttom_ep.evaluation_propositions[i] = EvaluationProposition(
                     **prop
                 )  # type: ignore
 
             for i, dep in enumerate(
-                collaboration_ep.evaluation_proposition_dependencies
+                enacttom_ep.evaluation_proposition_dependencies
             ):
-                collaboration_ep.evaluation_proposition_dependencies[
+                enacttom_ep.evaluation_proposition_dependencies[
                     i
                 ] = EvaluationPropositionDependency(
                     **dep
                 )  # type: ignore
 
-            for i, constraint in enumerate(collaboration_ep.evaluation_constraints):
+            for i, constraint in enumerate(enacttom_ep.evaluation_constraints):
                 constraint_cls = getattr(evaluation_functions, constraint["type"])  # type: ignore
-                collaboration_ep.evaluation_constraints[i] = constraint_cls(
+                enacttom_ep.evaluation_constraints[i] = constraint_cls(
                     **constraint["args"]  # type: ignore
                 )
 
-            collaboration_ep = self.apply_scene_dir_prefix(collaboration_ep, scenes_dir)
-            self.episodes.append(collaboration_ep)
+            enacttom_ep = self.apply_scene_dir_prefix(enacttom_ep, scenes_dir)
+            self.episodes.append(enacttom_ep)
 
     def from_binary(
         self, data_dict: Dict[str, Any], scenes_dir: Optional[str] = None
@@ -158,6 +158,6 @@ class CollaborationDatasetV0(RearrangeDatasetV0):
                 )
             ep["markers"] = new_markers
 
-            collaboration_ep = CollaborationEpisode(**ep)
-            collaboration_ep = self.apply_scene_dir_prefix(collaboration_ep, scenes_dir)
-            self.episodes.append(collaboration_ep)
+            enacttom_ep = EnactToMEpisode(**ep)
+            enacttom_ep = self.apply_scene_dir_prefix(enacttom_ep, scenes_dir)
+            self.episodes.append(enacttom_ep)

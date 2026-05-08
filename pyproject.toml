@@ -1,5 +1,4 @@
 [tool.isort]
-skip_glob = ["*/third_party/*"]
 profile = 'black'
 treat_comments_as_code = "# %%"
 
@@ -9,7 +8,6 @@ exclude = [
     "__pycache__",
     "data",
     "docs",
-    "third_party",
     "*__init__.py*"
 ]
 ignore = [

@@ -140,7 +140,7 @@ class FRT_CG_Prompt(Prompt):
     def __init__(self, name, llm_conf) -> None:
         super().__init__(name, llm_conf)
         self._prompt = """[INST]<<SYS>>You are an intelligent agent who supports fulfilling
-the human's provided instructions in the house. This includes finding receptacles of
+the user's provided instructions in the house. This includes finding receptacles of
 interest in the house. You will be provided with a list of receptacles in the house as a
 list of <receptacle_id> : <receptacle_name> and a query to find the receptacle of
 interest. The names of receptacles may not completely match the queried receptacle, so
