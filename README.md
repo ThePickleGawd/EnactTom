@@ -6,16 +6,16 @@ The conceptual source of truth is [docs/benchmark-architecture.md](docs/benchmar
 
 ## Setup
 
-Create a local Python environment for lightweight checks with `uv`:
+Create the EnactToM environment:
 
 ```bash
-uv venv .venv --python 3.11
-source .venv/bin/activate
-uv pip install -r requirements.txt
-uv pip install -e .
+mamba create -n enacttom python=3.9.2 cmake=3.14.0 -y
+mamba activate enacttom
+python -m pip install -r requirements.txt
+python -m pip install -e .
 ```
 
-Habitat execution requires the full simulator and dataset setup described in [docs/installation.md](docs/installation.md). The benchmark runner is intentionally not wrapped in extra compatibility layers; use the environment and assets configured for this checkout.
+Use `conda` in place of `mamba` if needed. Habitat execution requires the full simulator and dataset setup described in [docs/installation.md](docs/installation.md).
 
 Configure model credentials through environment variables or a repo-root `.env` file:
 

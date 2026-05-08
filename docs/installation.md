@@ -1,17 +1,22 @@
 # Installation
 
-This is the full setup path for running EnactToM with Habitat. Use `uv` for Python package installation, but keep `conda` or `mamba` for the Habitat-Sim and PyTorch binary stack.
+This is the full setup path for running EnactToM with Habitat. Use `mamba` for the environment and binary stack; `conda` works as a slower drop-in replacement.
 
 ## Prerequisites
 
 - `git-lfs`
-- `uv`
 - `conda` or `mamba`
 - GPU/CUDA drivers if running the benchmark on Linux with CUDA
 
+Initialize Git LFS once on the machine before downloading assets:
+
+```bash
+git lfs install
+```
+
 ## Environment
 
-Create the Habitat runtime environment:
+Create the Habitat runtime environment. Replace `mamba` with `conda` if mamba is unavailable:
 
 ```bash
 mamba create -n enacttom python=3.9.2 cmake=3.14.0 -y
@@ -25,21 +30,29 @@ mamba install pytorch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 pytorch-cuda=
 mamba install habitat-sim=0.3.3 withbullet headless -c conda-forge -c aihabitat -y
 ```
 
-Install Habitat-Lab/Baselines from the upstream revisions this repo was cleaned against, then install EnactToM:
+Install Habitat-Lab/Baselines from the upstream revisions this repo was cleaned against, then install EnactToM inside the active conda environment:
 
 ```bash
 HABITAT_LAB_COMMIT=094d6be2f9d057e4781a68ae792132895fd4d3d0
 
-uv pip install "git+https://github.com/facebookresearch/habitat-lab.git@${HABITAT_LAB_COMMIT}#subdirectory=habitat-lab"
-uv pip install "git+https://github.com/facebookresearch/habitat-lab.git@${HABITAT_LAB_COMMIT}#subdirectory=habitat-baselines"
-uv pip install -r requirements.txt
-uv pip install -e .
+python -m pip install "git+https://github.com/facebookresearch/habitat-lab.git@${HABITAT_LAB_COMMIT}#subdirectory=habitat-lab"
+python -m pip install "git+https://github.com/facebookresearch/habitat-lab.git@${HABITAT_LAB_COMMIT}#subdirectory=habitat-baselines"
+python -m pip install -r requirements.txt
+python -m pip install opencv-python==4.10.0.82
+python -m pip install -e .
 ```
 
 If using AWS Bedrock instead of OpenAI/Anthropic direct APIs, install the optional AWS client:
 
 ```bash
-uv pip install boto3
+python -m pip install boto3
+```
+
+Optional developer hooks:
+
+```bash
+python -m pip install pre-commit
+pre-commit install
 ```
 
 If dynamic libraries fail to load, make sure the active conda environment library directory is on `LD_LIBRARY_PATH`.
