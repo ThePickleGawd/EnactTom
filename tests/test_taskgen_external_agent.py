@@ -1,6 +1,7 @@
 from datetime import datetime
 import json
 from pathlib import Path
+import sys
 
 from enacttom.task_gen.external_agent import ExternalAgentLauncher
 from enacttom.task_gen.prompts import build_external_taskgen_prompt
@@ -38,7 +39,8 @@ def test_external_agent_launcher_builds_backend_commands(tmp_path):
         model="o3",
     )
 
-    assert mini_cmd[:5] == ["/tmp/mini", "-c", "mini.yaml", "-c", "environment.timeout=1200"]
+    assert mini_cmd[:3] == ["/tmp/mini", "-c", "mini.yaml"]
+    assert mini_cmd.count("-c") == 1
     assert "-y" in mini_cmd
     assert "--exit-immediately" in mini_cmd
     assert "-m" in mini_cmd
@@ -95,6 +97,7 @@ def test_ensure_agent_environment_only_creates_sandbox_env(monkeypatch, tmp_path
 
     assert len(calls) == 1
     assert calls[0][1] == "create task-gen agent environment"
+    assert calls[0][0][:3] == [sys.executable, "-m", "venv"]
     assert str(launcher.agent_env_dir(workspace_dir)) in calls[0][0]
 
 

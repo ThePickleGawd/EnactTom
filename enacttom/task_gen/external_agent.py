@@ -16,7 +16,6 @@ class ExternalAgentLauncher:
     def __init__(self, project_root: Path):
         self.project_root = project_root
         self.base_tmp_dir = project_root / "tmp" / "task_gen"
-        self.bootstrap_cache_dir = project_root / "tmp" / "uv-cache"
 
     def agent_env_dir(self, workspace_dir: Path) -> Path:
         return workspace_dir / ".venv"
@@ -24,25 +23,17 @@ class ExternalAgentLauncher:
     def agent_python(self, workspace_dir: Path) -> Path:
         return self.agent_env_dir(workspace_dir) / "bin" / "python"
 
-    def mini_cli_env_dir(self, workspace_dir: Path) -> Path:
-        return workspace_dir / ".mini-cli"
-
-    def mini_cli_executable(self, workspace_dir: Path) -> Path:
-        return self.mini_cli_env_dir(workspace_dir) / "bin" / "mini"
-
     def ensure_agent_environment(self, workspace_dir: Path) -> Path:
         self.base_tmp_dir.mkdir(parents=True, exist_ok=True)
         env_dir = self.agent_env_dir(workspace_dir)
         if not self.agent_python(workspace_dir).exists():
-            cmd = ["uv", "venv", str(env_dir), "--python", sys.executable]
+            cmd = [sys.executable, "-m", "venv", str(env_dir)]
             self._run_bootstrap(cmd, "create task-gen agent environment")
 
         return env_dir
 
     def _run_bootstrap(self, cmd: List[str], description: str) -> None:
         env = dict(os.environ)
-        self.bootstrap_cache_dir.mkdir(parents=True, exist_ok=True)
-        env.setdefault("UV_CACHE_DIR", str(self.bootstrap_cache_dir))
         env.setdefault("XDG_CACHE_HOME", str(self.project_root / "tmp" / "xdg-cache"))
         try:
             subprocess.run(cmd, cwd=str(self.project_root), check=True, env=env)
@@ -117,44 +108,12 @@ class ExternalAgentLauncher:
         }
         executable = executable_names[agent_name]
         resolved = shutil.which(executable, path=env.get("PATH"))
-        if not resolved and agent_name == "mini":
-            resolved = self._ensure_mini_cli(workspace_dir=Path(env["VIRTUAL_ENV"]).parent)
         if not resolved:
             raise ExternalAgentError(
                 f"Could not find executable '{executable}' for task-gen agent '{agent_name}'. "
-                f"For mini, either install mini-swe-agent in a Python 3.10+ operator environment "
-                f"or let the launcher provision it with uv."
+                "Install and authenticate the requested external agent CLI before running generation."
             )
         return resolved
-
-    def _ensure_mini_cli(self, workspace_dir: Path) -> Optional[str]:
-        mini_executable = self.mini_cli_executable(workspace_dir)
-        if mini_executable.exists():
-            return str(mini_executable)
-
-        mini_env_dir = self.mini_cli_env_dir(workspace_dir)
-        try:
-            self._run_bootstrap(
-                ["uv", "venv", "--python", "3.11", str(mini_env_dir)],
-                "create mini CLI environment",
-            )
-            self._run_bootstrap(
-                [
-                    "uv",
-                    "pip",
-                    "install",
-                    "--python",
-                    str(mini_env_dir / "bin" / "python"),
-                    "mini-swe-agent",
-                ],
-                "install mini-swe-agent in mini CLI environment",
-            )
-        except ExternalAgentError:
-            return None
-
-        if mini_executable.exists():
-            return str(mini_executable)
-        return None
 
     def build_command(
         self,
@@ -172,8 +131,6 @@ class ExternalAgentLauncher:
                 executable,
                 "-c",
                 "mini.yaml",
-                "-c",
-                "environment.timeout=1200",
                 "-y",
             ]
             if model:

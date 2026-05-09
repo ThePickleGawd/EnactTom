@@ -8,9 +8,9 @@ for multi-agent evaluation.
 By default, runs ALL tasks in data/enacttom/tasks/. Use --task to run a single task.
 
 Usage:
-    ./enacttom/run_enacttom.sh benchmark                    # Run all tasks
-    ./enacttom/run_enacttom.sh benchmark --model sonnet     # Run all tasks with Claude Sonnet
-    ./enacttom/run_enacttom.sh benchmark --task task.json   # Run single task
+    ./enacttom/run.sh benchmark                    # Run all tasks
+    ./enacttom/run.sh benchmark --model sonnet     # Run all tasks with Claude Sonnet
+    ./enacttom/run.sh benchmark --task task.json   # Run single task
 """
 
 from __future__ import annotations
@@ -728,14 +728,14 @@ def main(config: DictConfig) -> None:
         # All tasks mode: run all tasks in the directory
         if not task_dir.exists():
             cprint(f"ERROR: Task directory not found: {task_dir}", "red")
-            cprint("Run task generation first: ./enacttom/run_enacttom.sh generate", "yellow")
+            cprint("Run task generation first: ./enacttom/run.sh generate", "yellow")
             sys.exit(1)
 
         tasks, raw_data = load_all_tasks(task_dir)
 
         if not tasks:
             cprint(f"ERROR: No tasks found in {task_dir}", "red")
-            cprint("Run task generation first: ./enacttom/run_enacttom.sh generate", "yellow")
+            cprint("Run task generation first: ./enacttom/run.sh generate", "yellow")
             sys.exit(1)
 
         # Filter by agent count if specified

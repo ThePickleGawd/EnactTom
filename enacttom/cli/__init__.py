@@ -4,7 +4,7 @@ Shared CLI infrastructure for EnactToM tools.
 Every CLI module's run() returns a CLIResult dict.
 Agent.py imports and calls run() directly (pure-function tools)
 or spawns ``python -m enacttom.cli.<module>`` (GL-context tools).
-External callers (Claude Code, run_enacttom.sh) read JSON from stdout.
+External callers (Claude Code, run.sh) read JSON from stdout.
 """
 
 from __future__ import annotations

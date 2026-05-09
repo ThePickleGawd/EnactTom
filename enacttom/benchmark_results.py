@@ -191,7 +191,7 @@ def run_benchmark(
     selector_max_frames: int = 5,
     selector_max_candidates: int = 12,
 ) -> BenchmarkResults:
-    """Run benchmark via run_enacttom.sh and parse results.
+    """Run benchmark via run.sh and parse results.
 
     Args:
         tasks_dir: Directory containing task JSONs to benchmark.
@@ -205,7 +205,7 @@ def run_benchmark(
         BenchmarkResults with parsed per-task results.
     """
     cmd = [
-        "./enacttom/run_enacttom.sh", "benchmark",
+        "./enacttom/run.sh", "benchmark",
         "--tasks-dir", str(tasks_dir),
         "--model", model,
         "--output-dir", str(output_dir),
@@ -548,7 +548,7 @@ def run_benchmark_parallel(
             while len(active) < max_workers and job_idx < total_tasks:
                 stem, task_input, bench_out = jobs[job_idx]
                 cmd = [
-                    "./enacttom/run_enacttom.sh", "benchmark",
+                    "./enacttom/run.sh", "benchmark",
                     "--tasks-dir", task_input,
                     "--model", model,
                     "--output-dir", bench_out,

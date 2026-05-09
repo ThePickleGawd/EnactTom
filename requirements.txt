@@ -1,5 +1,6 @@
 hydra-core
 matplotlib==3.6.3
+mini-swe-agent==1.7.0
 networkx
 numpy==1.26.4
 openai==1.10.0

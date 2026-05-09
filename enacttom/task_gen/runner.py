@@ -6,7 +6,7 @@ Usage:
     python enacttom/task_gen/runner.py --config-name examples/enacttom_2_robots +model=gpt-5
 
 Or via shell script:
-    ./enacttom/run_enacttom.sh generate --model gpt-5 --task-gen-agent mini
+    ./enacttom/run.sh generate --model gpt-5 --task-gen-agent mini
 """
 
 from __future__ import annotations

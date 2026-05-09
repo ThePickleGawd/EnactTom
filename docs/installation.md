@@ -7,10 +7,10 @@ needed for scene generation, replay, and benchmarking.
 ## Local Setup
 
 The local setup runs task validation, PDDL solving, task-generation utilities,
-and the test suite:
+the default `mini` authoring agent, and the test suite:
 
 ```bash
-conda create -n enacttom python=3.9.2 cmake=3.14.0 -y
+conda create -n enacttom python=3.10 cmake=3.14.0 -y
 conda activate enacttom
 python -m pip install -r requirements.txt
 python -m pip install -e .
@@ -21,10 +21,10 @@ Use `mamba` instead of `conda` if it is available.
 Check the install:
 
 ```bash
-bash -n enacttom/run_enacttom.sh
+bash -n enacttom/run.sh
 python -m compileall -q enacttom habitat_llm tests
 python -m pytest
-./enacttom/run_enacttom.sh --help
+./enacttom/run.sh --help
 ```
 
 ## Habitat Setup
@@ -138,9 +138,9 @@ python -m pip install boto3
 Run Habitat-backed checks only after the asset checks pass:
 
 ```bash
-./enacttom/run_enacttom.sh new-scene --agents 2 --output-dir /tmp/enacttom-scene
-./enacttom/run_enacttom.sh generate --num-tasks 1 --difficulty standard
-./enacttom/run_enacttom.sh benchmark --tasks-dir data/enacttom/tasks --model gpt-5.4 --num-times 3
+./enacttom/run.sh new-scene --agents 2 --output-dir /tmp/enacttom-scene
+./enacttom/run.sh generate --num-tasks 1 --difficulty standard
+./enacttom/run.sh benchmark --tasks-dir data/enacttom/tasks --model gpt-5.4 --num-times 3
 ```
 
 Legacy task datasets, neural-network skill checkpoints, semantic map/RAG data,

@@ -36,7 +36,7 @@ from enacttom.benchmark_results import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-RUN_EnactToM = PROJECT_ROOT / "enacttom" / "run_enacttom.sh"
+RUN_EnactToM = PROJECT_ROOT / "enacttom" / "run.sh"
 
 
 def _style(text: str, *codes: str) -> str:

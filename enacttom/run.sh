@@ -68,7 +68,7 @@ usage() {
 EnactToM paper pipeline
 
 Usage:
-  ./enacttom/run_enacttom.sh <command> [options]
+  ./enacttom/run.sh <command> [options]
 
 Core commands:
   generate       Generate paper benchmark tasks with the external task authoring agent
@@ -102,19 +102,19 @@ Common options:
   --help
 
 Bulk generation:
-  ./enacttom/run_enacttom.sh generate --bulk --num-tasks 24 --per-gpu 3
-  ./enacttom/run_enacttom.sh generate --bulk --run-until 100 --difficulty hard
+  ./enacttom/run.sh generate --bulk --num-tasks 24 --per-gpu 3
+  ./enacttom/run.sh generate --bulk --run-until 100 --difficulty hard
 
 Examples:
-  ./enacttom/run_enacttom.sh generate --num-tasks 3 --difficulty standard
-  ./enacttom/run_enacttom.sh judge --task data/enacttom/tasks/example.json
-  ./enacttom/run_enacttom.sh benchmark --tasks-dir data/enacttom/tasks --model gpt-5.4 --num-times 3
+  ./enacttom/run.sh generate --num-tasks 3 --difficulty standard
+  ./enacttom/run.sh judge --task data/enacttom/tasks/example.json
+  ./enacttom/run.sh benchmark --tasks-dir data/enacttom/tasks --model gpt-5.4 --num-times 3
 EOF
 }
 
 die() {
     echo -e "${RED}Error:${NC} $1" >&2
-    echo "Hint: ./enacttom/run_enacttom.sh --help" >&2
+    echo "Hint: ./enacttom/run.sh --help" >&2
     exit 1
 }
 
@@ -338,7 +338,7 @@ run_bulk_worker() {
     stdout_log="$worker_dir/stdout.log"
     mkdir -p "$worker_dir"
 
-    local cmd=("./enacttom/run_enacttom.sh" "${BULK_CHILD_ARGS[@]}" --category "$category")
+    local cmd=("./enacttom/run.sh" "${BULK_CHILD_ARGS[@]}" --category "$category")
     [[ -n "$k_level" ]] && cmd+=(--k-level $k_level)
 
     if [[ "$DRY_RUN" == true ]]; then

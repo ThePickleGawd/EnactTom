@@ -1,6 +1,6 @@
 """CLI entry point for parallel benchmark execution.
 
-Called by run_enacttom.sh when --max-workers is specified.
+Called by run.sh when --max-workers is specified.
 Runs one benchmark subprocess per task JSON with GPU round-robin.
 Calibration is skipped by default; pass --calibration to write per-task updates.
 

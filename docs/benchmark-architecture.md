@@ -27,7 +27,7 @@ The retained pipeline is:
 8. Submit accepted tasks.
 9. Benchmark agents on the accepted task set.
 
-Bulk task generation is native to `./enacttom/run_enacttom.sh generate --bulk`. Bulk workers still run the same one-task generation path; the launcher only assigns worker IDs, GPU slots, categories, and shared run/output directories.
+Bulk task generation is native to `./enacttom/run.sh generate --bulk`. Bulk workers still run the same one-task generation path; the launcher only assigns worker IDs, GPU slots, categories, and shared run/output directories.
 
 There is no separate campaign, migration, salvage, reinforcement-learning, or evolution pipeline. Difficulty shaping is part of normal generation:
 
@@ -74,12 +74,12 @@ Functional success ignores `K()` and evaluates the projected non-epistemic goal.
 - `enacttom/pddl/`: goal language, epistemic compilation, and solvability checks
 - `enacttom/task_gen/`: task authoring surface, seed selection, validation, judging, calibration, and submission gates
 - `enacttom/runner/`: Habitat execution runtime
-- `enacttom/cli/`: stable command surfaces used by `./enacttom/run_enacttom.sh` and external authoring agents
+- `enacttom/cli/`: stable command surfaces used by `./enacttom/run.sh` and external authoring agents
 - `docs/*.md`: conceptual behavior and architecture
 
 ## Invariants
 
-- Keep `./enacttom/run_enacttom.sh` as the main entry point.
+- Keep `./enacttom/run.sh` as the main entry point.
 - Keep one clear implementation path for each paper flow.
 - Keep `problem_pddl` as the single authored source of epistemic structure and goals.
 - Generate scene objects and mechanic init facts deterministically from the loaded scene snapshot and `mechanic_bindings`.

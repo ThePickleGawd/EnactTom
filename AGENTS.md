@@ -2,7 +2,7 @@
 
 ## Conventions
 
-- Use `./enacttom/run_enacttom.sh` as the main entry point. Do not call internal Python entrypoints directly unless there is a clear reason.
+- Use `./enacttom/run.sh` as the main entry point. Do not call internal Python entrypoints directly unless there is a clear reason.
 - Do not commit unless explicitly asked.
 - Keep the implementation dead simple. Prefer one correct path over extra flags, compatibility layers, or speculative abstractions.
 - Do not hardcode logic that should scale with the benchmark, especially prompt content, action descriptions, mechanic handling, and agent-specific behavior.
