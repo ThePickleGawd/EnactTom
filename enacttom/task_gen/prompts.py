@@ -10,6 +10,7 @@ MINISWEAGENT_TASKGEN_PROMPT = """You are generating multi-agent benchmark tasks 
 
 Use normal shell commands for inspection and file edits.
 Use the repo-owned `taskgen` commands for scene loading, judging, testing, submission, and finish/fail.
+Run only one `taskgen` command at a time and wait for it to finish before starting another.
 {query_block}{verification_block}{calibration_block}{k_level_block}{sampled_task_block}
 Generate {num_tasks} quality benchmark tasks.
 
@@ -342,7 +343,7 @@ def build_external_taskgen_prompt(
 
     pddl_rules = (
         "- Treat `problem_pddl` as machine-owned except for `:goal` and optional `:goal-owners`.\n"
-        "- Do not hand-edit `:objects` or `:init`.\n"
+        "- Do not hand-edit the `(define (problem ...))` name, `:domain`, `:objects`, or `:init`.\n"
         "- Use only predicates from `available_predicates.md`.\n\n"
     )
     pddl_checklist = (

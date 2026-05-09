@@ -13,6 +13,7 @@ import json
 import os
 import re
 import sys
+import traceback
 from pathlib import Path
 
 
@@ -376,6 +377,7 @@ def main():
             "valid": False,
             "error": f"Verification error: {e}",
             "executed_steps": executed_steps,
+            "traceback": traceback.format_exc(),
         })
         sys.exit(1)
 

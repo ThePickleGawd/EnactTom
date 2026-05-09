@@ -15,8 +15,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import fcntl
+import sys
+from pathlib import Path
 
-from enacttom.cli import print_result
+from enacttom.cli import failure, print_result
 from enacttom.task_gen.event_log import append_event, write_worker_snapshot
 from enacttom.task_gen.session import TaskGenSession
 
@@ -52,22 +55,64 @@ def main() -> None:
         event_payload["reason"] = args.reason
     append_event(generation_worker_dir, "taskgen_command_started", **event_payload)
 
-    if args.command == "new_scene":
-        result = session.new_scene(args.num_agents, keep=args.keep)
-    elif args.command == "judge":
-        result = session.judge()
-    elif args.command == "test_task":
-        result = session.test_task()
-    elif args.command == "verify_task":
-        result = session.verify_task()
-    elif args.command == "submit_task":
-        result = session.submit_task()
-    elif args.command == "status":
-        result = session.status()
-    elif args.command == "finish":
-        result = session.finish()
-    else:
-        result = session.fail(args.reason)
+    lock_path = Path(args.working_dir) / ".taskgen.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_file = lock_path.open("w")
+    try:
+        fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        result = failure(
+            "Another taskgen command is already running for this working directory.",
+            data={"working_dir": args.working_dir, "lock_file": str(lock_path)},
+        )
+        append_event(
+            generation_worker_dir,
+            "taskgen_command_finished",
+            **event_payload,
+            success=False,
+            error=result["error"],
+            data=result["data"],
+        )
+        write_worker_snapshot(
+            generation_worker_dir,
+            status="running",
+            submitted_count=len(session.state.get("submitted_tasks", [])),
+            target_tasks=session.state.get("num_tasks_target"),
+            current_task_index=session.state.get("current_task_index"),
+            current_k_level=session.state.get("current_k_level"),
+            scene_id=session.state.get("scene_id"),
+            episode_id=session.state.get("episode_id"),
+            finished=session.state.get("finished", False),
+            failed=session.state.get("failed", False),
+            fail_reason=session.state.get("fail_reason", ""),
+            submitted_tasks=session.state.get("submitted_tasks", []),
+            last_command=args.command,
+            last_command_success=False,
+            last_command_error=result["error"],
+        )
+        print_result(result)
+        sys.exit(1)
+
+    try:
+        if args.command == "new_scene":
+            result = session.new_scene(args.num_agents, keep=args.keep)
+        elif args.command == "judge":
+            result = session.judge()
+        elif args.command == "test_task":
+            result = session.test_task()
+        elif args.command == "verify_task":
+            result = session.verify_task()
+        elif args.command == "submit_task":
+            result = session.submit_task()
+        elif args.command == "status":
+            result = session.status()
+        elif args.command == "finish":
+            result = session.finish()
+        else:
+            result = session.fail(args.reason)
+    finally:
+        fcntl.flock(lock_file, fcntl.LOCK_UN)
+        lock_file.close()
 
     append_event(
         generation_worker_dir,
