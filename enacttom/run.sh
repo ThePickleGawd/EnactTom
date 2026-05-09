@@ -117,6 +117,18 @@ die() {
     exit 1
 }
 
+python_bin() {
+    if [[ -n "${ENACTTOM_PYTHON:-}" ]]; then
+        echo "$ENACTTOM_PYTHON"
+        return
+    fi
+    if [[ -n "${CONDA_PREFIX:-}" && -x "$CONDA_PREFIX/bin/python" ]]; then
+        echo "$CONDA_PREFIX/bin/python"
+        return
+    fi
+    command -v python
+}
+
 require_value() {
     local flag=$1
     local value=${2:-}
@@ -185,7 +197,9 @@ get_agent_config() {
 
 task_agents() {
     if [[ -n "$TASK_FILE" ]]; then
-        python3 -c "import json; print(json.load(open('$TASK_FILE')).get('num_agents', 2))" 2>/dev/null || echo 2
+        local py
+        py="$(python_bin)"
+        "$py" -c 'import json, sys; print(json.load(open(sys.argv[1])).get("num_agents", 2))' "$TASK_FILE" 2>/dev/null || echo 2
     else
         echo "$AGENTS_MAX"
     fi
@@ -200,10 +214,11 @@ run_generate() {
     [[ -z "$LLM_PROVIDER" ]] && LLM_PROVIDER="$(detect_llm_provider "$MODEL")"
     [[ -z "$LLM_PROVIDER" ]] && LLM_PROVIDER="external_cli"
 
-    local model_expanded config output_dir
+    local model_expanded config output_dir py
     model_expanded="$(expand_model_name "$MODEL")"
     config="$(get_agent_config "$AGENTS_MAX")"
     output_dir="${OUTPUT_DIR:-data/enacttom/tasks}"
+    py="$(python_bin)"
 
     local args=()
     [[ -n "$QUERY" ]] && args+=(--query "$QUERY")
@@ -222,7 +237,7 @@ run_generate() {
     [[ -n "$JUDGE_DIFFICULTY" ]] && args+=(--judge-difficulty "$JUDGE_DIFFICULTY")
     [[ -n "$TEST_MODEL" ]] && args+=(--test-model "$(normalize_model_alias "$TEST_MODEL")")
     [[ -n "$K_LEVEL" ]] && args+=(--k-level $K_LEVEL)
-    python enacttom/task_gen/runner.py \
+    "$py" enacttom/task_gen/runner.py \
         "${args[@]}" \
         --config-name "$config" \
         +num_tasks="$NUM_TASKS" \
@@ -449,12 +464,13 @@ run_bulk_generate() {
 }
 
 run_benchmark() {
-    local model_short model_expanded output_base category_override save_video_override
+    local model_short model_expanded output_base category_override save_video_override py
     model_short="$(normalize_model_alias "$MODEL")"
     [[ -z "$LLM_PROVIDER" ]] && LLM_PROVIDER="$(detect_llm_provider "$MODEL")"
     [[ -z "$LLM_PROVIDER" ]] && die "unknown model '$MODEL'"
     model_expanded="$(expand_model_name "$MODEL")"
     output_base="${OUTPUT_DIR:-./outputs/enacttom/$(date +%Y-%m-%d_%H-%M-%S)-benchmark}"
+    py="$(python_bin)"
     save_video_override=""
     [[ "$NO_VIDEO" == true ]] && save_video_override="++evaluation.save_video=false"
     category_override=""
@@ -462,7 +478,7 @@ run_benchmark() {
 
     if [[ "$NUM_TIMES" -gt 1 ]]; then
         local repeat_cmd=(
-            python -m enacttom.scripts.benchmark_repeat
+            "$py" -m enacttom.scripts.benchmark_repeat
             --model "$model_short"
             --output-dir "$output_base"
             --num-times "$NUM_TIMES"
@@ -503,7 +519,7 @@ run_benchmark() {
             done
         fi
         [[ "$LLM_PROVIDER" == "anthropic_claude" ]] && load_anthropic_api_key
-        python enacttom/examples/run_habitat_benchmark.py \
+        "$py" enacttom/examples/run_habitat_benchmark.py \
             --config-name "$config" \
             habitat.environment.max_episode_steps="$MAX_SIM_STEPS" \
             $max_turns_override \
@@ -525,7 +541,7 @@ run_benchmark() {
 
     if [[ -n "$WORKERS_PER_GPU" || -n "$MAX_WORKERS" ]]; then
         local parallel_cmd=(
-            python -m enacttom.scripts.run_benchmark_parallel
+            "$py" -m enacttom.scripts.run_benchmark_parallel
             --tasks-dir "$task_dir"
             --model "$model_short"
             --output-dir "$output_base"
@@ -541,12 +557,12 @@ run_benchmark() {
         [[ -n "$CATEGORY" ]] && parallel_cmd+=(--category "$CATEGORY")
         [[ "$NO_CALIBRATION" == true ]] && parallel_cmd+=(--no-calibration) || parallel_cmd+=(--calibration)
         "${parallel_cmd[@]}"
-        python -m enacttom.scripts.print_benchmark_summary --output-dir "$output_base" --model "$model_short" --parallel
+        "$py" -m enacttom.scripts.print_benchmark_summary --output-dir "$output_base" --model "$model_short" --parallel
         return
     fi
 
     local counts
-    counts=$(python3 -c "
+    counts=$("$py" -c "
 import json
 from pathlib import Path
 category = '$CATEGORY' or None
@@ -564,7 +580,7 @@ print(' '.join(map(str, sorted(counts))))
         local config
         config="$(get_agent_config "$num_agents")"
         [[ "$LLM_PROVIDER" == "anthropic_claude" ]] && load_anthropic_api_key
-        python enacttom/examples/run_habitat_benchmark.py \
+        "$py" enacttom/examples/run_habitat_benchmark.py \
             --config-name "$config" \
             habitat.environment.max_episode_steps="$MAX_SIM_STEPS" \
             $save_video_override \
@@ -577,29 +593,30 @@ print(' '.join(map(str, sorted(counts))))
             +llm_provider="$LLM_PROVIDER" \
             "hydra.run.dir=${output_base}-${num_agents}agents"
     done
-    python -m enacttom.scripts.print_benchmark_summary --output-dir "$output_base" --model "$model_short"
+    "$py" -m enacttom.scripts.print_benchmark_summary --output-dir "$output_base" --model "$model_short"
 }
 
 run_judge() {
     [[ -z "$TASK_FILE" ]] && die "--task is required"
     local args=("$TASK_FILE" --threshold "$THRESHOLD")
     [[ -n "$JUDGE_DIFFICULTY" ]] && args+=(--difficulty "$JUDGE_DIFFICULTY")
-    python -m enacttom.cli.judge_task "${args[@]}"
+    "$(python_bin)" -m enacttom.cli.judge_task "${args[@]}"
 }
 
 run_verify() {
     [[ -z "$TASK_FILE" ]] && die "--task is required"
     [[ ! -f "$TASK_FILE" ]] && die "task file not found: $TASK_FILE"
-    local num_agents config result_file workdir log_file
+    local num_agents config result_file workdir log_file py
     num_agents="$(task_agents)"
     config="$(get_agent_config "$num_agents")"
     result_file="${REPORT_FILE:-/tmp/enacttom_verify_$(date +%Y%m%d_%H%M%S)_$$.json}"
     workdir="${OUTPUT_DIR:-/tmp}"
     log_file="${result_file%.json}.log"
+    py="$(python_bin)"
     mkdir -p "$(dirname "$result_file")" "$workdir"
 
     set +e
-    python -m enacttom.cli.verify_trajectory \
+    "$py" -m enacttom.cli.verify_trajectory \
         "$TASK_FILE" \
         --working-dir "$workdir" \
         --config-name "$config" \
@@ -608,7 +625,7 @@ run_verify() {
     set -e
 
     cat "$log_file"
-    python3 - <<PY
+    "$py" - <<PY
 import json, re
 from pathlib import Path
 p = Path("$result_file")
@@ -637,14 +654,14 @@ run_verify_pddl() {
     [[ -z "$TASK_FILE" ]] && die "--task is required"
     local args=("$TASK_FILE")
     [[ -n "$OUTPUT_DIR" ]] && args+=(--working-dir "$OUTPUT_DIR")
-    python -m enacttom.cli.verify_pddl "${args[@]}"
+    "$(python_bin)" -m enacttom.cli.verify_pddl "${args[@]}"
 }
 
 run_validate_task() {
     [[ -z "$TASK_FILE" ]] && die "--task is required"
     local args=("$TASK_FILE")
     [[ -n "$SCENE_DATA_FILE" ]] && args+=(--scene-file "$SCENE_DATA_FILE")
-    python -m enacttom.cli.validate_task "${args[@]}"
+    "$(python_bin)" -m enacttom.cli.validate_task "${args[@]}"
 }
 
 run_test_task() {
@@ -653,16 +670,16 @@ run_test_task() {
     [[ -n "$OUTPUT_DIR" ]] && args+=(--working-dir "$OUTPUT_DIR" --trajectory-dir "$OUTPUT_DIR/trajectories")
     [[ -n "$TEST_MODEL" ]] && args+=(--test-model "$TEST_MODEL")
     [[ -n "$BENCHMARK_RUN_MODE" ]] && args+=(--run-mode "$BENCHMARK_RUN_MODE")
-    python -m enacttom.cli.test_task "${args[@]}"
+    "$(python_bin)" -m enacttom.cli.test_task "${args[@]}"
 }
 
 run_new_scene() {
-    python -m enacttom.cli.new_scene "${AGENTS_MAX:-2}" --working-dir "${OUTPUT_DIR:-/tmp/enacttom_scene}"
+    "$(python_bin)" -m enacttom.cli.new_scene "${AGENTS_MAX:-2}" --working-dir "${OUTPUT_DIR:-/tmp/enacttom_scene}"
 }
 
 run_submit_task() {
     [[ -z "$TASK_FILE" ]] && die "--task is required"
-    python -m enacttom.cli.submit_task "$TASK_FILE" --output-dir "${OUTPUT_DIR:-data/enacttom/tasks}"
+    "$(python_bin)" -m enacttom.cli.submit_task "$TASK_FILE" --output-dir "${OUTPUT_DIR:-data/enacttom/tasks}"
 }
 
 while [[ $# -gt 0 ]]; do

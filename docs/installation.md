@@ -68,11 +68,11 @@ python -m pip install pillow==10.4.0 numpy-quaternion==2023.0.4 matplotlib==3.6.
 python -m pip install -e . --no-deps
 ```
 
-When running generation from `enacttom-habitat`, put the py3.10 authoring env's
-`mini` executable on `PATH`:
+When running generation from `enacttom-habitat`, keep the active Habitat env
+first on `PATH` and add the py3.10 authoring env's `mini` executable after it:
 
 ```bash
-export PATH="$(conda info --base)/envs/enacttom/bin:$PATH"
+export PATH="$CONDA_PREFIX/bin:$(conda info --base)/envs/enacttom/bin:$PATH"
 ```
 
 If dynamic libraries fail to load, make sure the active conda environment's
@@ -112,8 +112,9 @@ Provide the EnactToM episode file expected by
 
 ```bash
 mkdir -p data/datasets/enacttom_episodes/v0_0
-# Place train_2k.json.gz here:
-# data/datasets/enacttom_episodes/v0_0/train_2k.json.gz
+curl -L --fail \
+  -o data/datasets/enacttom_episodes/v0_0/train_2k.json.gz \
+  https://huggingface.co/datasets/ai-habitat/partnr_episodes/resolve/main/v0_0/train_2k.json.gz
 ```
 
 Alternatively, point the runner at another compatible episode file:

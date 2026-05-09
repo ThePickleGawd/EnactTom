@@ -51,7 +51,7 @@ Generate benchmark tasks after the Habitat setup is complete:
 
 ```bash
 conda activate enacttom-habitat
-export PATH="$(conda info --base)/envs/enacttom/bin:$PATH"
+export PATH="$CONDA_PREFIX/bin:$(conda info --base)/envs/enacttom/bin:$PATH"
 ./enacttom/run.sh generate --num-tasks 3 --difficulty standard
 ./enacttom/run.sh generate --num-tasks 3 --difficulty hard
 ```
