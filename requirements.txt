@@ -3,6 +3,7 @@ matplotlib==3.6.3
 networkx
 numpy==1.26.4
 openai==1.10.0
+opencv-python==4.10.0.82
 pandas
 pytest
 tqdm>=4.0.0
