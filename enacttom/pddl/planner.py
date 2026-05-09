@@ -559,6 +559,36 @@ def append_runtime_ops(
     )
 
 
+def _remote_control_runtime_action(
+    task_data: Dict[str, Any],
+    step_name: str,
+    target: str,
+) -> Optional[Tuple[str, str]]:
+    """Return the physical trigger action for a remote-control target step."""
+    for binding in normalize_mechanic_bindings(
+        task_data.get("mechanic_bindings", []),
+        problem_pddl=task_data.get("problem_pddl"),
+    ):
+        if not isinstance(binding, dict):
+            continue
+        if binding.get("mechanic_type") != "remote_control":
+            continue
+        if binding.get("target_object") != target:
+            continue
+
+        trigger = binding.get("trigger_object")
+        if not isinstance(trigger, str) or not trigger:
+            continue
+
+        target_state = binding.get("target_state") or "is_open"
+        if step_name == "open" and target_state in {"is_open", "is_unlocked"}:
+            return "Open", trigger
+        if step_name == "close" and target_state in {"is_closed", "is_locked"}:
+            return "Open", trigger
+
+    return None
+
+
 def extract_runtime_state(problem: Any) -> RuntimeState:
     """Extract the minimal mutable state needed for dependency-aware translation."""
     from enacttom.pddl.dsl import Literal
@@ -871,24 +901,32 @@ def generate_deterministic_trajectory(
             require_type(args[0], "agent", step)
             require_type(args[1], "furniture", step)
             require_type(args[2], "room", step)
+            action_name, action_target = _remote_control_runtime_action(
+                task_data, step_name, args[1],
+            ) or ("Open", args[1])
+            require_type(action_target, "furniture", step)
             append_runtime_ops(
                 runtime_ops,
                 args[0],
-                f"Open[{args[1]}]",
-                resources=[("furniture", args[1])],
-                navigate_target=args[1],
+                f"{action_name}[{action_target}]",
+                resources=[("furniture", action_target)],
+                navigate_target=action_target,
             )
             continue
         if step_name == "close" and len(args) == 3:
             require_type(args[0], "agent", step)
             require_type(args[1], "furniture", step)
             require_type(args[2], "room", step)
+            action_name, action_target = _remote_control_runtime_action(
+                task_data, step_name, args[1],
+            ) or ("Close", args[1])
+            require_type(action_target, "furniture", step)
             append_runtime_ops(
                 runtime_ops,
                 args[0],
-                f"Close[{args[1]}]",
-                resources=[("furniture", args[1])],
-                navigate_target=args[1],
+                f"{action_name}[{action_target}]",
+                resources=[("furniture", action_target)],
+                navigate_target=action_target,
             )
             continue
         if step_name == "navigate" and len(args) == 2:

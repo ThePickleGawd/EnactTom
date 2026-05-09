@@ -7,3 +7,5 @@ pandas
 pytest
 tqdm>=4.0.0
 typing_extensions
+unified-planning==1.3.0
+up-fast-downward==0.5.2

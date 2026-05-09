@@ -28,28 +28,6 @@ from typing import Any, Dict, Optional
 
 from enacttom.cli import CLIResult, failure, success
 from enacttom.cli.task_metadata import compute_strict_tom_metadata
-
-
-def _syntactic_k_depth(pddl_str: str) -> int:
-    """Count max nesting depth of K() operators in a PDDL goal string.
-
-    Pure string parsing — no solver required. Returns 0 if no K() found.
-    """
-    max_depth = 0
-    current_depth = 0
-    i = 0
-    while i < len(pddl_str):
-        # Match "(K " (epistemic operator)
-        if pddl_str[i:i+3] == "(K " and (i == 0 or not pddl_str[i-1].isalpha()):
-            current_depth += 1
-            max_depth = max(max_depth, current_depth)
-            i += 3
-        elif pddl_str[i] == ")" and current_depth > 0:
-            current_depth -= 1
-            i += 1
-        else:
-            i += 1
-    return max_depth
 from enacttom.task_gen.task_bootstrap import canonicalize_task_problem_pddl
 
 
@@ -180,8 +158,6 @@ def run(
         )
 
     # Compute and persist ToM metadata from canonical PDDL at submit time.
-    # Try strict FD proof first; fall back to syntactic K-depth when unavailable.
-    tom_method = "strict_fd"
     try:
         tom_meta = _compute_tom_metadata(task_data, scene_data=scene_data)
         task_data["tom_level"] = tom_meta["tom_level"]
@@ -191,37 +167,18 @@ def run(
             task_data.pop("tom_reasoning", None)
         _apply_runtime_metadata(task_data)
     except Exception as e:
-        # Fallback: derive tom_level from syntactic K() nesting depth in problem_pddl.
-        # This doesn't prove the K() goals are non-trivial, but it ensures K≥1 tasks
-        # actually contain epistemic operators.
-        import logging
-        logger = logging.getLogger("enacttom.submit")
+        return failure(f"Failed to compute tom_level: {e}")
 
-        pddl_str = task_data.get("problem_pddl", "")
-        syntactic_depth = _syntactic_k_depth(pddl_str)
-        task_data["tom_level"] = syntactic_depth
-        task_data["tom_reasoning"] = (
-            f"Syntactic fallback: K() nesting depth = {syntactic_depth} "
-            f"(strict FD proof unavailable: {e})"
-        )
-        tom_method = "syntactic_fallback"
-        logger.warning(
-            "Strict FD tom_level failed (%s); using syntactic K-depth = %d",
-            e, syntactic_depth,
-        )
-
-        # Still apply runtime metadata (independent of tom proof)
-        try:
-            _apply_runtime_metadata(task_data)
-        except Exception as runtime_err:
-            return failure(f"Failed to apply runtime metadata: {runtime_err}")
-
-    task_data["tom_level_method"] = tom_method
+    task_data["tom_level_method"] = "strict_fd"
 
     if task_data["tom_level"] < 1:
         return failure(
             "Task tom_level is 0. EnactToM tasks must require at least one K() goal in problem_pddl.",
-            data={"computed_tom_level": task_data["tom_level"], "required_min": 1, "method": tom_method},
+            data={
+                "computed_tom_level": task_data["tom_level"],
+                "required_min": 1,
+                "method": "strict_fd",
+            },
         )
 
     # Enforce allowed ToM levels when specified.

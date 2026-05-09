@@ -12,7 +12,17 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
-from habitat_llm.planner import LLMPlanner
+try:
+    from habitat_llm.planner import LLMPlanner
+except (ImportError, ModuleNotFoundError):
+    class LLMPlanner:
+        """Placeholder used when Habitat is not installed."""
+
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            del args, kwargs
+            raise RuntimeError(
+                "EmtomPlanner requires the full Habitat setup from docs/installation.md."
+            )
 
 from enacttom.vision import (
     build_candidate_frame_set,

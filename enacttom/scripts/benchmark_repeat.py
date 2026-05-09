@@ -176,17 +176,23 @@ def _build_run_command(args: argparse.Namespace, run_output_dir: Path) -> list[s
     else:
         cmd.extend(["--task", args.task])
 
-    if args.max_llm_calls is not None:
-        cmd.extend(["--max-llm-calls", str(args.max_llm_calls)])
-    if args.workers_per_gpu is not None:
-        cmd.extend(["--workers-per-gpu", str(args.workers_per_gpu)])
-    elif args.max_workers is not None:
-        cmd.extend(["--max-workers", str(args.max_workers)])
-    if args.num_gpus is not None:
-        cmd.extend(["--num-gpus", str(args.num_gpus)])
-    if args.category:
-        cmd.extend(["--category", args.category])
-    if args.video:
+    max_llm_calls = getattr(args, "max_llm_calls", None)
+    workers_per_gpu = getattr(args, "workers_per_gpu", None)
+    max_workers = getattr(args, "max_workers", None)
+    num_gpus = getattr(args, "num_gpus", None)
+    category = getattr(args, "category", None)
+
+    if max_llm_calls is not None:
+        cmd.extend(["--max-llm-calls", str(max_llm_calls)])
+    if workers_per_gpu is not None:
+        cmd.extend(["--workers-per-gpu", str(workers_per_gpu)])
+    elif max_workers is not None:
+        cmd.extend(["--max-workers", str(max_workers)])
+    if num_gpus is not None:
+        cmd.extend(["--num-gpus", str(num_gpus)])
+    if category:
+        cmd.extend(["--category", category])
+    if getattr(args, "video", False):
         cmd.append("--video")
 
     return cmd
@@ -195,7 +201,10 @@ def _build_run_command(args: argparse.Namespace, run_output_dir: Path) -> list[s
 def _parse_run_results(args: argparse.Namespace, run_output_dir: Path) -> BenchmarkResults:
     if args.task:
         return parse_benchmark_results(str(run_output_dir), args.model)
-    if args.max_workers is not None or args.workers_per_gpu is not None:
+    if (
+        getattr(args, "max_workers", None) is not None
+        or getattr(args, "workers_per_gpu", None) is not None
+    ):
         try:
             return parse_parallel_benchmark_results(str(run_output_dir), args.model)
         except Exception:
@@ -216,14 +225,20 @@ def _launch_run(
     log_path = _run_log_path(run_output_dir)
     log_handle = open(log_path, "w", encoding="utf-8")
     try:
-        proc = subprocess.Popen(
-            cmd,
-            cwd=PROJECT_ROOT,
-            stdout=log_handle,
-            stderr=subprocess.STDOUT,
-            text=True,
-            start_new_session=True,
-        )
+        popen_kwargs = {
+            "cwd": PROJECT_ROOT,
+            "stdout": log_handle,
+            "stderr": subprocess.STDOUT,
+            "text": True,
+            "start_new_session": True,
+        }
+        try:
+            proc = subprocess.Popen(cmd, **popen_kwargs)
+        except TypeError as exc:
+            if "start_new_session" not in str(exc):
+                raise
+            popen_kwargs.pop("start_new_session")
+            proc = subprocess.Popen(cmd, **popen_kwargs)
     except Exception:
         log_handle.close()
         raise

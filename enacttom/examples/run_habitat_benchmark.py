@@ -13,6 +13,8 @@ Usage:
     ./enacttom/run_enacttom.sh benchmark --task task.json   # Run single task
 """
 
+from __future__ import annotations
+
 import json
 import os
 import sys
@@ -26,18 +28,46 @@ sys.path.insert(0, str(project_root))
 import hydra
 from omegaconf import DictConfig, OmegaConf, open_dict
 
-from habitat_llm.agent.env import (
-    EnvironmentInterface,
-    register_actions,
-    register_measures,
-    register_sensors,
-)
-from habitat_llm.agent.env.dataset import EnactToMDatasetV0
-from habitat_llm.utils import cprint, setup_config, fix_config
-
 from enacttom.api_costs import summarize_task_costs
 from enacttom.runner.benchmark import BenchmarkExecutionError
 from enacttom.task_gen import GeneratedTask
+
+try:
+    from habitat_llm.utils import cprint
+except (ImportError, ModuleNotFoundError):
+    def cprint(text: str, color: str = "") -> None:
+        del color
+        print(text)
+
+
+def _load_habitat_runtime():
+    """Import Habitat-backed runtime pieces only when the benchmark actually runs."""
+    try:
+        from habitat_llm.agent.env import (
+            EnvironmentInterface,
+            register_actions,
+            register_measures,
+            register_sensors,
+        )
+        from habitat_llm.agent.env.dataset import EnactToMDatasetV0
+        from habitat_llm.utils import cprint as runtime_cprint
+        from habitat_llm.utils import fix_config, setup_config
+    except (ImportError, ModuleNotFoundError) as exc:
+        raise RuntimeError(
+            "Habitat benchmark execution requires the full Habitat setup from "
+            "docs/installation.md."
+        ) from exc
+
+    return {
+        "EnvironmentInterface": EnvironmentInterface,
+        "EnactToMDatasetV0": EnactToMDatasetV0,
+        "register_actions": register_actions,
+        "register_measures": register_measures,
+        "register_sensors": register_sensors,
+        "setup_config": setup_config,
+        "fix_config": fix_config,
+        "cprint": runtime_cprint,
+    }
 
 
 MODEL_ALIASES = {
@@ -222,7 +252,7 @@ def ensure_benchmark_observation_config(config: DictConfig) -> None:
                     "selector_min_frames": 1,
                     "selector_max_frames": 5,
                     "selector_max_candidates": 12,
-                    "image_format": "jpeg",
+                    "image_format": "png",
                 }
             )
 
@@ -620,6 +650,17 @@ def _print_category_stats(category_stats: dict) -> None:
 @hydra.main(version_base=None, config_path="../../habitat_llm/conf")
 def main(config: DictConfig) -> None:
     """Main entry point with Hydra configuration."""
+    runtime = _load_habitat_runtime()
+    global cprint
+    cprint = runtime["cprint"]
+    fix_config = runtime["fix_config"]
+    setup_config = runtime["setup_config"]
+    register_sensors = runtime["register_sensors"]
+    register_actions = runtime["register_actions"]
+    register_measures = runtime["register_measures"]
+    EnactToMDatasetV0 = runtime["EnactToMDatasetV0"]
+    EnvironmentInterface = runtime["EnvironmentInterface"]
+
     fix_config(config)
     config = setup_config(config, seed=47668090)
     ensure_benchmark_observation_config(config)

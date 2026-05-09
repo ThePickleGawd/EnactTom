@@ -98,7 +98,7 @@ def extract_agent_rgb_frame(
 class VisualObservationStore:
     """Persist per-turn RGB observations and return lightweight frame handles."""
 
-    def __init__(self, root_dir: str, image_format: str = "jpeg"):
+    def __init__(self, root_dir: str, image_format: str = "png"):
         self.root_dir = Path(root_dir)
         self.root_dir.mkdir(parents=True, exist_ok=True)
         self.image_format = image_format.lower().lstrip(".") or "png"

@@ -164,7 +164,7 @@ class BenchmarkRunner(EnactToMBaseRunner):
 
         if self._is_vision_mode():
             vision_cfg = getattr(self.config, "benchmark_vision", None)
-            image_format = getattr(vision_cfg, "image_format", "jpeg") if vision_cfg else "jpeg"
+            image_format = getattr(vision_cfg, "image_format", "png") if vision_cfg else "png"
             self._visual_store = VisualObservationStore(
                 os.path.join(self.output_dir, "visual_observations"),
                 image_format=image_format,
