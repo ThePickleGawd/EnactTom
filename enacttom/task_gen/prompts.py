@@ -169,9 +169,13 @@ def build_external_taskgen_prompt(
     skip_steps: Optional[List[str]] = None,
 ) -> str:
     skip = set(skip_steps or [])
-    skip_pddl = "pddl" in skip
+    unsupported_skips = sorted(skip - {"seed-sampling", "secret-strategy"})
+    if unsupported_skips:
+        raise ValueError(
+            "Cannot remove required pipeline components: "
+            + ", ".join(unsupported_skips)
+        )
     skip_seed_sampling = "seed-sampling" in skip
-    skip_test = "test" in skip
     skip_secret_strategy = "secret-strategy" in skip
 
     query_block = ""
@@ -331,28 +335,20 @@ def build_external_taskgen_prompt(
             "- Study `task`, `active_mechanics`, `mechanic_bindings`, `agent_secrets`, `agent_actions`, `problem_pddl`, and `num_agents` first.\n"
         )
 
-    test_command = "- `taskgen test_task`\n" if not skip_test else ""
-    skip_test_rule = "- Do not call `taskgen test_task` for this run.\n\n" if skip_test else ""
-    test_gate_line = (
-        "- `taskgen test_task` is the real execution gate: `judge` is not enough if baseline still cannot complete the task.\n\n"
-        if not skip_test
-        else "\n"
-    )
-    test_checklist = "- After `taskgen judge` passes, run `taskgen test_task` before submitting.\n\n" if not skip_test else ""
+    test_command = "- `taskgen test_task`\n"
+    skip_test_rule = ""
+    test_gate_line = "- `taskgen test_task` is the real execution gate: `judge` is not enough if baseline still cannot complete the task.\n\n"
+    test_checklist = "- After `taskgen judge` passes, run `taskgen test_task` before submitting.\n\n"
 
-    if skip_pddl:
-        pddl_rules = "- Write the natural-language task, secrets, and mechanics directly.\n\n"
-        pddl_checklist = ""
-    else:
-        pddl_rules = (
-            "- Treat `problem_pddl` as machine-owned except for `:goal` and optional `:goal-owners`.\n"
-            "- Do not hand-edit `:objects` or `:init`.\n"
-            "- Use only predicates from `available_predicates.md`.\n\n"
-        )
-        pddl_checklist = (
-            "- `problem_pddl` has a valid `:goal` and, when needed, valid `:goal-owners`.\n"
-            "- `:objects` and `:init` were not hand-edited.\n"
-        )
+    pddl_rules = (
+        "- Treat `problem_pddl` as machine-owned except for `:goal` and optional `:goal-owners`.\n"
+        "- Do not hand-edit `:objects` or `:init`.\n"
+        "- Use only predicates from `available_predicates.md`.\n\n"
+    )
+    pddl_checklist = (
+        "- `problem_pddl` has a valid `:goal` and, when needed, valid `:goal-owners`.\n"
+        "- `:objects` and `:init` were not hand-edited.\n"
+    )
 
     workflow_lines = [
         "1. Run `taskgen status`.",
@@ -363,13 +359,12 @@ def build_external_taskgen_prompt(
             f"3. Read all {sampled_task_count} sampled tasks in `{working_dir}/sampled_tasks/` before authoring. Start with any `*_fields.json` compact views when present. For each task, inspect `task`, `active_mechanics`, `mechanic_bindings`, `agent_secrets`, `agent_actions`, `problem_pddl`, and `num_agents`. Open the matching raw task JSON only if you need `calibration` or extra benchmark-behavior detail. Look for good practices in secrets, information splits, and mechanic usage. Reuse only structural patterns that look empirically solvable. Do not copy IDs directly."
         )
     edit_step_number = len(workflow_lines) + 1
-    edit_text = "Write the natural-language task, secrets, and mechanics." if skip_pddl else "Author `problem_pddl :goal` first, then make the natural-language fields and mechanics match it."
+    edit_text = "Author `problem_pddl :goal` first, then make the natural-language fields and mechanics match it."
     workflow_lines.append(f"{edit_step_number}. Edit `{task_file}`. {edit_text}")
     workflow_lines.append(f"{edit_step_number + 1}. Run `taskgen judge`, fix issues, and repeat until it passes.")
     final_step_number = edit_step_number + 2
-    if not skip_test:
-        workflow_lines.append(f"{final_step_number}. Run `taskgen test_task`.")
-        final_step_number += 1
+    workflow_lines.append(f"{final_step_number}. Run `taskgen test_task`.")
+    final_step_number += 1
     workflow_lines.append(f"{final_step_number}. Run `taskgen verify_task`.")
     workflow_lines.append(
         f"{final_step_number + 1}. If `taskgen test_task` or `taskgen verify_task` rejects the task, read `{benchmark_feedback_file}` and fix those exact issues before editing further."
@@ -385,7 +380,7 @@ def build_external_taskgen_prompt(
         category_rules = (
             "- Requested category: `COOPERATIVE`.\n"
             "- All goals are shared.\n"
-            + ("" if skip_pddl else "- Do not include `:goal-owners`.\n")
+            + "- Do not include `:goal-owners`.\n"
         )
     elif category == "mixed":
         category_rules = (
@@ -393,9 +388,7 @@ def build_external_taskgen_prompt(
             "- Public `task` covers only the shared objective.\n"
             "- Each relevant agent must have a hidden personal objective.\n"
             + (
-                ""
-                if skip_pddl
-                else "- Put personal objectives in `:goal-owners` using entries like `(agent_0 (is_open cabinet_10))`, not `(personal agent_0 ...)`.\n"
+                "- Put personal objectives in `:goal-owners` using entries like `(agent_0 (is_open cabinet_10))`, not `(personal agent_0 ...)`.\n"
             )
         )
     else:
@@ -408,22 +401,12 @@ def build_external_taskgen_prompt(
     if skip:
         removed_lines = [
             "",
-            "## Removed Pipeline Components",
-            f"The following pipeline components have been removed for this run via `--remove`: **{', '.join(sorted(skip))}**.",
+            "## Omitted Optional Context",
+            f"The following optional prompt context is omitted for this run: **{', '.join(sorted(skip))}**.",
             "Do not attempt to run or rely on these components.",
         ]
-        if skip_pddl:
-            removed_lines.append("- `pddl`: PDDL solvability verification is skipped, but you MUST still write `problem_pddl` as the canonical goal format.")
-        if "tom" in skip:
-            removed_lines.append("- `tom`: strict FD solver verification is skipped, but you MUST still write K() goals in problem_pddl. Syntactic K-depth is checked at submit.")
-        if "simulation" in skip:
-            removed_lines.append("- `simulation`: simulator verification is skipped inside `taskgen judge`.")
-        if "llm-council" in skip:
-            removed_lines.append("- `llm-council`: quality checks are auto-passed.")
         if skip_seed_sampling:
             removed_lines.append("- `seed-sampling`: no seed tasks or calibration data are available.")
-        if "test" in skip:
-            removed_lines.append("- `test`: skip `taskgen test_task` and go directly to submission.")
         if skip_secret_strategy:
             removed_lines.append("- `secret-strategy`: the prompt omits the rule that forbids strategy instructions in `agent_secrets`.")
         removed_components_block = "\n" + "\n".join(removed_lines)

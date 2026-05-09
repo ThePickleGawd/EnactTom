@@ -93,7 +93,7 @@ def parse_extra_args():
         type=str,
         nargs="+",
         default=None,
-        help="Skip pipeline components. Choices: pddl, llm-council, simulation, seed-sampling, tom, structure, test",
+        help=argparse.SUPPRESS,
     )
 
     args, remaining = parser.parse_known_args()
@@ -571,26 +571,7 @@ def main() -> None:
     task_gen_agent = extra_args.task_gen_agent if extra_args else "mini"
     skip_steps = extra_args.remove if extra_args else None
     if skip_steps:
-        # Canonical names and legacy aliases
-        _legacy_map = {"council": "llm-council", "golden": "simulation"}
-        skip_steps = [_legacy_map.get(s, s) for s in skip_steps]
-        valid_steps = {
-            "pddl",
-            "llm-council",
-            "simulation",
-            "seed-sampling",
-            "tom",
-            "structure",
-            "test",
-            "baseline",
-            "secret-strategy",
-        }
-        invalid = [s for s in skip_steps if s not in valid_steps]
-        if invalid:
-            raise SystemExit(
-                f"Error: --remove got invalid steps {invalid}. "
-                f"Valid choices: {sorted(valid_steps)}"
-            )
+        raise SystemExit("Error: --remove is no longer supported; generation runs the full pipeline.")
 
     if k_levels is not None:
         invalid = [k for k in k_levels if k not in (1, 2, 3)]

@@ -659,7 +659,7 @@ class TestJudgeTask:
         assert "Do NOT score or discuss `pddl_solvability`" in formal_checks
         assert "ignore formal solvability and compiled-plan evidence" in compiled_view
 
-    def test_judge_receives_skip_steps(self):
+    def test_judge_rejects_skipped_hard_gates(self):
         from enacttom.cli.judge_task import run
         from enacttom.task_gen.judge import CouncilVerdict
 
@@ -684,8 +684,9 @@ class TestJudgeTask:
 
                 result = run(str(task_path), skip_steps=["pddl", "tom", "simulation"])
 
-        assert result["success"] is True
-        assert mock_judge_cls.call_args.kwargs["skip_steps"] == ["pddl", "tom", "simulation"]
+        assert result["success"] is False
+        assert "cannot skip" in result["error"]
+        mock_judge_cls.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

@@ -1139,6 +1139,11 @@ class TaskGenSession:
             self._last_agent_models = self._determine_agent_models(task_data)
             _skip = set(self.state.get("skip_steps") or [])
             _skip_baseline = "baseline" in _skip
+            if _skip_baseline:
+                return {
+                    "error": "Baseline benchmark cannot be skipped; run both standard and baseline.",
+                    "trajectory_dir": str(run_dir),
+                }
 
             run_specs: List[Dict[str, Any]] = [
                 {
@@ -1147,14 +1152,13 @@ class TaskGenSession:
                     "run_dir": run_dir / "standard",
                 }
             ]
-            if not _skip_baseline:
-                run_specs.append(
-                    {
-                        "result_key": "baseline",
-                        "run_mode": "baseline",
-                        "run_dir": run_dir / "baseline",
-                    }
-                )
+            run_specs.append(
+                {
+                    "result_key": "baseline",
+                    "run_mode": "baseline",
+                    "run_dir": run_dir / "baseline",
+                }
+            )
 
             with ThreadPoolExecutor(max_workers=len(run_specs)) as executor:
                 futures = {
@@ -1190,60 +1194,38 @@ class TaskGenSession:
 
         category = task_data.get("category", "cooperative")
 
-        if _skip_baseline:
-            # Baseline skipped: gate based only on standard failing
-            std_eval = raw_results["standard"].get("evaluation", {})
-            standard_passed = _evaluation_passed(category, std_eval)
-            standard_progress = _evaluation_progress(category, std_eval)
-            comparison = {
-                "gate_passed": not standard_passed,
-                "functional_tom_signal": None,
-                "baseline_skipped": True,
-                "standard_passed": standard_passed,
-                "baseline_passed": None,
-                "standard_progress": standard_progress,
-                "baseline_progress": None,
-                "reasons": ["Baseline skipped (--remove baseline). Gate based on standard only."],
-            }
-            payload = {
-                "standard": raw_results["standard"],
-                "baseline": {"skipped": True, "reason": "--remove baseline"},
-                "comparison": comparison,
-                "trajectory_dir": str(run_dir),
-            }
-        else:
-            mode_results = {
-                "standard": raw_results["standard"],
-                "baseline": raw_results["baseline"],
-            }
+        mode_results = {
+            "standard": raw_results["standard"],
+            "baseline": raw_results["baseline"],
+        }
 
-            self._refresh_calibration_stats()
-            calibration_stats = self.state.get("calibration_stats") or {}
-            cat_stats = calibration_stats.get("by_category", {}).get(category, {})
-            if cat_stats.get("total", 0) > 0:
-                cal_rate = cat_stats.get("rate")
-                cal_passed = cat_stats.get("passed")
-                cal_failed = cat_stats.get("failed")
-            else:
-                cal_rate = calibration_stats.get("rate")
-                cal_passed = calibration_stats.get("passed")
-                cal_failed = calibration_stats.get("failed")
-            comparison = build_mode_comparison(
-                category,
-                mode_results["standard"],
-                mode_results["baseline"],
-                current_rate=cal_rate,
-                target_rate=calibration_stats.get("target_rate", 0.10),
-                current_passed=cal_passed,
-                current_failed=cal_failed,
-                hard_pass_rate_cap=calibration_stats.get("target_rate", 0.10) <= 0.05 + 1e-9,
-            )
-            payload = {
-                "standard": mode_results["standard"],
-                "baseline": mode_results["baseline"],
-                "comparison": comparison,
-                "trajectory_dir": str(run_dir),
-            }
+        self._refresh_calibration_stats()
+        calibration_stats = self.state.get("calibration_stats") or {}
+        cat_stats = calibration_stats.get("by_category", {}).get(category, {})
+        if cat_stats.get("total", 0) > 0:
+            cal_rate = cat_stats.get("rate")
+            cal_passed = cat_stats.get("passed")
+            cal_failed = cat_stats.get("failed")
+        else:
+            cal_rate = calibration_stats.get("rate")
+            cal_passed = calibration_stats.get("passed")
+            cal_failed = calibration_stats.get("failed")
+        comparison = build_mode_comparison(
+            category,
+            mode_results["standard"],
+            mode_results["baseline"],
+            current_rate=cal_rate,
+            target_rate=calibration_stats.get("target_rate", 0.10),
+            current_passed=cal_passed,
+            current_failed=cal_failed,
+            hard_pass_rate_cap=calibration_stats.get("target_rate", 0.10) <= 0.05 + 1e-9,
+        )
+        payload = {
+            "standard": mode_results["standard"],
+            "baseline": mode_results["baseline"],
+            "comparison": comparison,
+            "trajectory_dir": str(run_dir),
+        }
 
         with open(run_dir / "comparison.json", "w") as f:
             json.dump(payload, f, indent=2)
@@ -1262,34 +1244,6 @@ class TaskGenSession:
         validation_result = self._validate_task_structure(task_data)
         if not validation_result["success"]:
             return validation_result
-
-        try:
-            import hydra  # type: ignore
-            import habitat  # type: ignore
-            _deps_ok = True
-        except Exception as e:
-            _deps_ok = False
-            _deps_err = str(e)
-
-        if not _deps_ok:
-            from enacttom.pddl.planner import compute_task_spec_hash
-
-            spec_hash = compute_task_spec_hash(task_data)
-            self._clear_benchmark_feedback()
-            self.state["last_submission_verification_passed"] = True
-            self.state["last_submission_verification_spec_hash"] = spec_hash
-            self.state["last_submission_verification_results"] = {
-                "skipped": True,
-                "reason": f"Skipped simulator verification due to missing deps: {_deps_err}",
-                "required_failures": SUBMISSION_VERIFICATION_REQUIRED_FAILURES,
-                "models": SUBMISSION_VERIFICATION_MODELS,
-                "spec_hash": spec_hash,
-            }
-            self._write_state()
-            payload = dict(validation_result["data"])
-            payload.update(self.state["last_submission_verification_results"])
-            payload["gate"] = "PASSED"
-            return success(payload)
 
         import tempfile
 
@@ -1419,10 +1373,7 @@ class TaskGenSession:
     def test_task(self) -> CLIResult:
         _skip_test = self.state.get("skip_steps") or []
         if "test" in _skip_test:
-            self.state["last_test_passed"] = True
-            self._clear_benchmark_feedback()
-            self._write_state()
-            return success({"gate": "PASSED", "skipped": True, "reason": "--remove test"})
+            return failure("test_task cannot be skipped; run the benchmark test.")
 
         if not self.task_file.exists():
             return failure("working_task.json does not exist.")
@@ -1437,26 +1388,6 @@ class TaskGenSession:
         if not validation_result["success"]:
             return validation_result
 
-
-        # If simulator dependencies (Hydra/Habitat) are not available in this
-        # environment, we cannot run a full benchmark episode. In that case,
-        # fall back to a structure-only pass so external task authors can still
-        # submit tasks in lightweight CI containers.
-        try:
-            import hydra  # type: ignore
-            import habitat  # type: ignore
-            _deps_ok = True
-        except Exception as e:
-            _deps_ok = False
-            _deps_err = str(e)
-
-        if not _deps_ok:
-            self.state["last_test_passed"] = True
-            self._clear_benchmark_feedback()
-            self._write_state()
-            payload = dict(validation_result["data"])
-            payload.update({"warning": f"Skipped simulator test due to missing deps: {_deps_err}", "gate": "PASSED"})
-            return success(payload)
         try:
             results = self._run_benchmark(task_data)
         except Exception as e:
@@ -1538,9 +1469,6 @@ class TaskGenSession:
         data = result.get("data") or {}
         golden = data.get("golden_trajectory") or {}
         if golden.get("sim_verified"):
-            # Note: in lightweight envs sim verification may be skipped due to missing
-            # hydra/habitat deps; judge_task.py still sets sim_verified=True in that case.
-            
             self.state["last_verify_passed"] = True
             self.state["last_verified_spec_hash"] = golden.get("spec_hash")
             self.state["last_verified_trajectory_hash"] = golden.get("trajectory_hash")
@@ -1577,21 +1505,16 @@ class TaskGenSession:
         return success(data)
 
     def submit_task(self) -> CLIResult:
-        _skip = set(self.state.get("skip_steps") or [])
-        if not self.state.get("last_judge_passed") and "llm-council" not in _skip:
+        if not self.state.get("last_judge_passed"):
             return failure(
                 "Must run judge successfully before submitting. "
                 "judge now includes golden trajectory regeneration and simulator verification."
             )
-        # In some environments we skip simulator verification (e.g., missing Hydra/GL deps).
-        # When simulation is skipped, allow submission as long as judge + test passed.
-        if not self.state.get("last_verify_passed") and "simulation" not in _skip:
+        if not self.state.get("last_verify_passed"):
             return failure(
-                "Must simulator-verify the regenerated golden trajectory before submitting. "
-                "If simulator verification is unavailable in this environment, add 'simulation' to skip_steps "
-                "in taskgen_state.json."
+                "Must simulator-verify the regenerated golden trajectory before submitting."
             )
-        if not self.state.get("last_test_passed") and "test" not in _skip:
+        if not self.state.get("last_test_passed"):
             return failure("Must run test_task successfully before submitting.")
         if not self.state.get("last_submission_verification_passed"):
             return failure(

@@ -1197,21 +1197,7 @@ class Judge:
                 elif self.verbose:
                     print(f"[Judge] Loaded rollout: success={rollout.success}, {rollout.steps} steps")
 
-        # Evaluate with all models in parallel
-        # Lightweight fallback: if Hydra (Habitat dependency) is not importable,
-        # skip the LLM council and return a pass verdict. This keeps taskgen
-        # usable in minimal CI containers where only JSON/PDDL validation runs.
-        try:
-            import hydra  # type: ignore
-        except Exception as e:
-            return CouncilVerdict(
-                judgments={},
-                passed=True,
-                overall_score=1.0,
-                required_fixes=[],
-                disagreements=[],
-            )
-
+        # Evaluate with all models in parallel.
         from concurrent.futures import ALL_COMPLETED, ThreadPoolExecutor, wait
 
         if self.verbose:

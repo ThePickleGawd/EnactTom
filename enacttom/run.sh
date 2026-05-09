@@ -36,7 +36,6 @@ SUBTASKS_MIN=3
 SUBTASKS_MAX=20
 ITERATIONS_PER_TASK=200
 K_LEVEL=""
-REMOVE_STEPS=""
 NO_ICL=false
 THRESHOLD=0.7
 JUDGE_DIFFICULTY=""
@@ -223,8 +222,6 @@ run_generate() {
     [[ -n "$JUDGE_DIFFICULTY" ]] && args+=(--judge-difficulty "$JUDGE_DIFFICULTY")
     [[ -n "$TEST_MODEL" ]] && args+=(--test-model "$(normalize_model_alias "$TEST_MODEL")")
     [[ -n "$K_LEVEL" ]] && args+=(--k-level $K_LEVEL)
-    [[ -n "$REMOVE_STEPS" ]] && args+=(--remove $REMOVE_STEPS)
-
     python enacttom/task_gen/runner.py \
         "${args[@]}" \
         --config-name "$config" \
@@ -300,7 +297,6 @@ build_bulk_generate_args() {
     [[ -n "$THRESHOLD" ]] && BULK_CHILD_ARGS+=(--threshold "$THRESHOLD")
     [[ -n "$JUDGE_DIFFICULTY" ]] && BULK_CHILD_ARGS+=(--judge-difficulty "$JUDGE_DIFFICULTY")
     [[ -n "$TEST_MODEL" ]] && BULK_CHILD_ARGS+=(--test-model "$TEST_MODEL")
-    [[ -n "$REMOVE_STEPS" ]] && BULK_CHILD_ARGS+=(--remove $REMOVE_STEPS)
     return 0
 }
 
@@ -738,13 +734,7 @@ while [[ $# -gt 0 ]]; do
         --k-distribution)
             require_value "$1" "${2:-}"; K_DISTRIBUTION="$2"; shift 2 ;;
         --remove)
-            shift
-            REMOVE_STEPS=""
-            while [[ $# -gt 0 && "$1" != --* ]]; do
-                REMOVE_STEPS="${REMOVE_STEPS:+$REMOVE_STEPS }$1"
-                shift
-            done
-            [[ -z "$REMOVE_STEPS" ]] && die "--remove requires at least one step" ;;
+            die "--remove is no longer supported; run the full pipeline" ;;
         --no-icl)
             NO_ICL=true; shift ;;
         --threshold)
