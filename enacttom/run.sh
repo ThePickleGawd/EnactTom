@@ -44,7 +44,7 @@ MAX_SIM_STEPS=200000
 MAX_LLM_CALLS=""
 MAX_WORKERS=""
 WORKERS_PER_GPU=""
-NUM_GPUS=8
+NUM_GPUS=""
 NUM_TIMES=3
 BULK_GENERATE=false
 RUN_UNTIL=""
@@ -258,6 +258,10 @@ allocate_bulk_output_dir() {
 }
 
 detect_gpu_count() {
+    if [[ -n "$NUM_GPUS" ]]; then
+        echo "$NUM_GPUS"
+        return
+    fi
     if command -v nvidia-smi >/dev/null 2>&1; then
         local detected
         detected="$(nvidia-smi --list-gpus 2>/dev/null | wc -l | tr -d ' ')"
@@ -266,7 +270,7 @@ detect_gpu_count() {
             return
         fi
     fi
-    echo "$NUM_GPUS"
+    echo 1
 }
 
 count_task_files() {
