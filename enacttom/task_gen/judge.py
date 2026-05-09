@@ -10,17 +10,16 @@ Priority criteria (evaluated first, fixes prioritized):
 - agent_necessity: Every agent must be indispensable
 - secret_relevance: Secrets must be required for task completion
 
-Uses a multi-LLM council (Kimi K2.5 + GPT-5.2) to reduce bias.
-Both models must agree for a task to pass.
+Uses `gpt-5.4-mini` by default.
 
 Usage:
     # CLI
     python -m enacttom.task_gen.judge --task <path>
-    python -m enacttom.task_gen.judge --task <path> --models kimi-k2.5,gpt-5.2
+    python -m enacttom.task_gen.judge --task <path> --models gpt-5.4-mini
 
     # Programmatic
     from enacttom.task_gen.judge import Judge
-    judge = Judge(models=["kimi-k2.5", "gpt-5.2"])
+    judge = Judge(models=["gpt-5.4-mini"])
     verdict = judge.evaluate(task_data, scene_data)
 """
 
@@ -383,7 +382,7 @@ class Judgment:
 
 @dataclass
 class CouncilVerdict:
-    """Aggregated verdict from multi-model council."""
+    """Aggregated verdict from configured judge model(s)."""
 
     judgments: Dict[str, Judgment]  # model -> judgment
     passed: bool  # True only if ALL models pass
@@ -514,8 +513,8 @@ This task targets mid-tier models. Standard evaluation applies:
 - Secrets should require reasoning to use effectively.
 - Tasks should use mechanics appropriately (typically 2-4).
 - Moderate complexity in coordination is expected.""",
-    "hard": """## Intended Difficulty: HARD — Must defeat GPT-5.2
-This task must be difficult enough that GPT-5.2 CANNOT solve it. Apply strict standards:
+    "hard": """## Intended Difficulty: HARD — Must defeat gpt-5.4-mini
+This task must be difficult enough that gpt-5.4-mini CANNOT solve it. Apply strict standards:
 - **Agent necessity**: Each agent MUST hold unique information. Score LOW if any agent is removable.
 - **Task interdependence / goal opposition / subgoal tension**: Require information relay chains. Score LOW unless at least one goal depends on relayed (not directly observed) information.
 - **Secret quality**: Secrets must state only constraints, private facts, and abstract epistemic goals. NEVER prescribe relay chains, communication strategy, or what to tell other agents. Score 0 if any secret says "tell agent_X", "forward to agent_X", includes parenthetical strategy hints, or leaks the hidden object ID to an agent who is explicitly missing that information.
@@ -957,7 +956,7 @@ def _build_benchmark_comparison_section(task_dict: Dict[str, Any]) -> str:
 
 class Judge:
     """
-    Multi-LLM council judge for task validation.
+    LLM judge for task validation.
 
     Evaluates tasks using category-specific criteria:
     - Cooperative: 6 criteria (5 shared + task_interdependence)
@@ -967,14 +966,13 @@ class Judge:
     - agent_necessity: Every agent must be essential
     - secret_quality: Secrets must be actionable, natural, and non-leaking
 
-    Both models must agree for a task to pass.
+    The task passes only if every configured judge model passes.
     """
 
     # Priority criteria - required fixes should focus here first
     PRIORITY_CRITERIA = ["agent_necessity", "secret_quality"]
 
-    # Default council models
-    DEFAULT_MODELS = ["kimi-k2.5", "gpt-5.2"]
+    DEFAULT_MODELS = ["gpt-5.4-mini"]
     MODEL_REQUEST_TIMEOUT_S = 45
     COUNCIL_WALL_TIMEOUT_S = 180
     COUNCIL_RETRY_ATTEMPTS = 1
@@ -995,14 +993,14 @@ class Judge:
         Initialize the judge.
 
         Args:
-            models: List of model names for council (default: ["kimi-k2.5", "gpt-5.2"])
+            models: List of model names for judging (default: ["gpt-5.4-mini"])
             overall_threshold: Minimum overall score to pass (default 0.65)
             min_criterion_threshold: Minimum score for any criterion (default 0.5)
             verbose: Print debug information
             user_query: Optional user query that the task should align with
             diversity_tracker: Optional tracker to check task novelty against existing tasks
             difficulty: Intended difficulty level ("easy", "medium", "hard") for calibrated evaluation
-            skip_steps: Optional pipeline steps removed for this run (e.g. ["pddl"])
+            skip_steps: Optional prompt-only ablations.
         """
         self.models = models or self.DEFAULT_MODELS
         self.overall_threshold = overall_threshold
@@ -1025,30 +1023,8 @@ class Judge:
     def _get_llm_client(self, model: str) -> "BaseLLM":
         """Get or create LLM client for a model."""
         if model not in self._llm_clients:
-            instantiate_llm = None  # lazy import below
-            # Avoid importing LLM backends (which may pull in habitat/habitat_sim)
-            # when the caller explicitly disables the LLM council.
-            if os.environ.get("TASKGEN_SKIP_LLM", "").lower() in {"1","true","yes"}:
-                class _DummyLLM:
-                    def generate(self, prompt, **kwargs):
-                        return "{}"
-                    def generate(self, prompt, **kwargs):
-                        return "{}"
-                self._llm_clients[model] = _DummyLLM()
-                return self._llm_clients[model]
-
             provider = _detect_provider_for_model(model)
             client_model = _resolve_client_model_name(model)
-            # Allow disabling LLM council in lightweight taskgen environments.
-            if os.environ.get("TASKGEN_SKIP_LLM", "").lower() in {"1","true","yes"}:
-                class _DummyLLM:
-                    def generate(self, prompt, **kwargs):
-                        return "{}"
-                    def generate(self, prompt, **kwargs):
-                        return "{}"
-                self._llm_clients[model] = _DummyLLM()
-                return self._llm_clients[model]
-
             from habitat_llm.llm import instantiate_llm
             self._llm_clients[model] = instantiate_llm(
                 provider,
@@ -1154,7 +1130,7 @@ class Judge:
         trajectory_dir: Optional[Path] = None,
     ) -> CouncilVerdict:
         """
-        Evaluate a task using the multi-model council.
+        Evaluate a task using the configured judge model(s).
 
         Args:
             task: GeneratedTask object or task dictionary
@@ -1482,9 +1458,9 @@ The user specifically requested:
         if not required_fixes:
             for name, criterion in criteria_scores.items():
                 if criterion.score < self.min_criterion_threshold:
-                    fallback_fix = f"Fix {name} ({criterion.score:.2f}): {criterion.reasoning}"
-                    if fallback_fix not in required_fixes:
-                        required_fixes.append(fallback_fix)
+                    criterion_fix = f"Fix {name} ({criterion.score:.2f}): {criterion.reasoning}"
+                    if criterion_fix not in required_fixes:
+                        required_fixes.append(criterion_fix)
 
         if not required_fixes and not is_valid and overall_score < self.overall_threshold:
             required_fixes.append(
@@ -1533,34 +1509,19 @@ The user specifically requested:
 
     def _aggregate(self, judgments: Dict[str, Judgment]) -> CouncilVerdict:
         """Aggregate judgments from multiple models."""
-        # If ANY model failed due to infrastructure, we can optionally continue
-        # with remaining models in environments where some providers are not
-        # configured (e.g., missing FIREWORKS_API_KEY for Kimi).
         infra_failures = {
             m: j for m, j in judgments.items()
             if self._is_infra_failure(j)
         }
         if infra_failures:
-            if os.getenv("TASKGEN_REQUIRE_FULL_COUNCIL", "").strip().lower() in {"1", "true", "yes"}:
-                # NOTE: Avoid backslashes inside f-string expressions (SyntaxError on Python 3.9).
-                failed_models = ", ".join(infra_failures.keys())
-                raise RuntimeError(
-                    "Judge council incomplete: "
-                    f"{failed_models} failed due to infrastructure errors. "
-                    "All council models are required for consistent task quality. "
-                    "Check API keys, billing, and network connectivity."
-                )
-            else:
-                failed_models = ", ".join(infra_failures.keys())
-                print(
-                    f"[Judge] WARNING: {failed_models} failed (infrastructure). "
-                    "Continuing with remaining models. Set TASKGEN_REQUIRE_FULL_COUNCIL=true to enforce all models."
-                )
-                for m in list(infra_failures.keys()):
-                    judgments.pop(m, None)
+            failed_models = ", ".join(infra_failures.keys())
+            raise RuntimeError(
+                "Judge failed due to infrastructure errors: "
+                f"{failed_models}. Check API keys, billing, and network connectivity."
+            )
 
         if not judgments:
-            raise RuntimeError("Judge council incomplete: all models failed due to infrastructure errors.")
+            raise RuntimeError("Judge failed: no model judgments were produced.")
 
 
         # Check if all models pass
@@ -1646,8 +1607,8 @@ def main():
         help="Path to task JSON file"
     )
     parser.add_argument(
-        "--models", type=str, default="kimi-k2.5,gpt-5.2",
-        help="Comma-separated list of models for council (default: kimi-k2.5,gpt-5.2)"
+        "--models", type=str, default="gpt-5.4-mini",
+        help="Comma-separated list of judge models (default: gpt-5.4-mini)"
     )
     parser.add_argument(
         "--threshold", type=float, default=0.65,
@@ -1688,7 +1649,7 @@ def main():
     # Parse models
     models = [m.strip() for m in args.models.split(",")]
 
-    print(f"{Colors.CYAN}Evaluating task with council: {models}{Colors.RESET}", file=sys.stderr)
+    print(f"{Colors.CYAN}Evaluating task with judge model(s): {models}{Colors.RESET}", file=sys.stderr)
 
     # Load trajectory dir if specified
     trajectory_dir = Path(args.trajectory_dir) if args.trajectory_dir else None

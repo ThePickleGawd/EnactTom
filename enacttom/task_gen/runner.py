@@ -57,7 +57,7 @@ def parse_extra_args():
     parser.add_argument("--query", type=str, default=None)
     parser.add_argument("--retry-verification", type=str, default=None)
     parser.add_argument("--target-model", type=str, default=None)
-    parser.add_argument("--calibration-model", type=str, default="gpt-5.2")
+    parser.add_argument("--calibration-model", type=str, default="gpt-5.4-mini")
     parser.add_argument("--target-pass-rate", type=float, default=0.10)
     parser.add_argument(
         "--category",
@@ -305,6 +305,37 @@ def _attempt_verified_task_submit(
             )
 
     return None
+
+
+def _required_habitat_asset_paths(project_root: Path) -> Dict[str, Path]:
+    episode_path = Path(
+        os.environ.get(
+            "ENACTTOM_EPISODES_PATH",
+            "data/datasets/enacttom_episodes/v0_0/train_2k.json.gz",
+        )
+    )
+    if not episode_path.is_absolute():
+        episode_path = project_root / episode_path
+
+    return {
+        "HSSD scene dataset config": project_root / "data/hssd-hab/hssd-hab-partnr.scene_dataset_config.json",
+        "EnactToM episode file": episode_path,
+        "OVMM object configs": project_root / "data/objects_ovmm/train_val/hssd/configs/objects",
+        "Spot arm robot URDF": project_root / "data/robot_variants/hab_spot_arm/urdf/hab_spot_arm_agent_0_scarlet.urdf",
+    }
+
+
+def _check_required_habitat_assets(project_root: Path) -> None:
+    missing = [
+        f"{label}: {path}"
+        for label, path in _required_habitat_asset_paths(project_root).items()
+        if not path.exists()
+    ]
+    if missing:
+        raise SystemExit(
+            "Error: missing required Habitat assets:\n- "
+            + "\n- ".join(missing)
+        )
 
 
 def _copy_sample(src_path: Path, sampled_tasks_dir: Path, index: int) -> None:
@@ -557,7 +588,7 @@ def main() -> None:
     if extra_args:
         target_model = extra_args.target_model or extra_args.calibration_model
     if not target_model:
-        target_model = "gpt-5.2"
+        target_model = "gpt-5.4-mini"
     target_pass_rate = extra_args.target_pass_rate if extra_args else 0.10
     category = extra_args.category if extra_args else None
     seed_tasks_dir_arg = extra_args.seed_tasks_dir if extra_args else None
@@ -585,6 +616,7 @@ def main() -> None:
 
     verification_feedback = _load_verification_feedback(retry_verification)
     project_root = Path(__file__).resolve().parent.parent.parent
+    _check_required_habitat_assets(project_root)
     workspace_root = project_root / "tmp" / "task_gen"
     workspace_root.mkdir(parents=True, exist_ok=True)
     instance_id = build_workspace_id(task_gen_agent)

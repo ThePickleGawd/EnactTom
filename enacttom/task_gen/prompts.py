@@ -113,7 +113,7 @@ Vary at least TWO of these dimensions each task. Check sampled tasks to avoid du
 - Knowledge split: A knows object / B knows target; A knows both but cannot reach; B can reach but knows neither; both know partial info.
 - Narrative framing: household chore, museum setup, safety inspection, party prep, moving day, or another concrete scene-grounded story.
 {test_gate_line}
-- `taskgen verify_task` is the final submission gate: it runs `gpt-5.4`, `claude-sonnet-4-6`, and `gemini-flash` in standard mode. You may submit if at least 2 of the 3 models fail.
+- `taskgen verify_task` is the final submission gate: it runs `gpt-5.4-mini` in standard mode. You may submit if that model fails.
 
 ## Pre-Submit Checklist
 - The physical goal requires communication or partner modeling.
@@ -121,7 +121,7 @@ Vary at least TWO of these dimensions each task. Check sampled tasks to avoid du
 - Category fields are valid for the selected category.
 - Mechanics and secrets agree about actual constraints, but secrets do not explain the coordination plan.
 - No malformed bindings, missing required mechanic fields, or invalid message limits.
-{pddl_checklist}{test_checklist}- After `taskgen test_task` passes, run `taskgen verify_task`. Submit only if at least 2 of `gpt-5.4`, `claude-sonnet-4-6`, and `gemini-flash` fail.
+{pddl_checklist}{test_checklist}- After `taskgen test_task` passes, run `taskgen verify_task`. Submit only if `gpt-5.4-mini` fails.
 ## References
 - `available_predicates.md`: valid predicates and goal syntax.
 - `available_mechanics.md`: mechanic names and fields.
@@ -370,7 +370,7 @@ def build_external_taskgen_prompt(
         f"{final_step_number + 1}. If `taskgen test_task` or `taskgen verify_task` rejects the task, read `{benchmark_feedback_file}` and fix those exact issues before editing further."
     )
     workflow_lines.append(
-        f"{final_step_number + 2}. Submit only if verification passes, meaning at least 2 of `gpt-5.4`, `claude-sonnet-4-6`, and `gemini-flash` fail in standard mode."
+        f"{final_step_number + 2}. Submit only if verification passes, meaning `gpt-5.4-mini` fails in standard mode."
     )
     workflow_lines.append(f"{final_step_number + 3}. Run `taskgen submit_task`.")
     workflow_lines.append(f"{final_step_number + 4}. When you have submitted {num_tasks} tasks, run `taskgen finish`.")

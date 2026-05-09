@@ -11,7 +11,7 @@ line entry point is always `./enacttom/run.sh`.
 
 ## Installation
 
-Create the environment and install EnactToM:
+Create the default authoring environment and install EnactToM:
 
 ```bash
 conda create -n enacttom python=3.10 cmake=3.14.0 -y
@@ -23,7 +23,9 @@ python -m pip install -e .
 `mamba` can be used in place of `conda`. The requirements install the Python
 packages used by local validation, PDDL solving, tests, and the default `mini`
 task-generation agent. Habitat scene execution additionally requires the
-simulator and assets described in [docs/installation.md](docs/installation.md).
+simulator env and assets described in [docs/installation.md](docs/installation.md).
+The split is required because `mini-swe-agent` is Python 3.10+ while
+`habitat-sim==0.3.3` is installed in a Python 3.9 Habitat env.
 
 Run smoke checks:
 
@@ -41,11 +43,6 @@ the shell or in a repo-root `.env` file:
 
 ```bash
 OPENAI_API_KEY=...
-ANTHROPIC_API_KEY=...
-GEMINI_API_KEY=...
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
-AWS_DEFAULT_REGION=...
 ```
 
 ## Quick Start
@@ -53,6 +50,8 @@ AWS_DEFAULT_REGION=...
 Generate benchmark tasks after the Habitat setup is complete:
 
 ```bash
+conda activate enacttom-habitat
+export PATH="$(conda info --base)/envs/enacttom/bin:$PATH"
 ./enacttom/run.sh generate --num-tasks 3 --difficulty standard
 ./enacttom/run.sh generate --num-tasks 3 --difficulty hard
 ```
@@ -75,7 +74,7 @@ Benchmark a task set:
 ```bash
 ./enacttom/run.sh benchmark \
   --tasks-dir data/enacttom/tasks \
-  --model gpt-5.4 \
+  --model gpt-5.4-mini \
   --num-times 3
 ```
 

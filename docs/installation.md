@@ -30,7 +30,8 @@ python -m pytest
 ## Habitat Setup
 
 Habitat execution requires Linux, GPU/CUDA drivers for CUDA runs, `git-lfs`,
-and either `conda` or `mamba`.
+and either `conda` or `mamba`. Use a separate Habitat env: `mini-swe-agent`
+requires Python 3.10+, while `habitat-sim==0.3.3` is installed in Python 3.9.
 
 Initialize Git LFS once on the machine:
 
@@ -38,24 +39,40 @@ Initialize Git LFS once on the machine:
 git lfs install
 ```
 
-Install PyTorch and Habitat-Sim in the active `enacttom` environment. Adjust
-the CUDA package if the target machine uses a different CUDA runtime:
+Create and activate the Habitat runtime env:
 
 ```bash
-conda install pytorch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 pytorch-cuda=12.4 -c pytorch -c nvidia -y
+conda create -n enacttom-habitat python=3.9.2 cmake=3.14.0 -y
+conda activate enacttom-habitat
+```
+
+Install PyTorch and Habitat-Sim. Adjust the CUDA package if the target machine
+uses a different CUDA runtime:
+
+```bash
+conda install pytorch==2.4.1 torchvision==0.19.1 torchaudio==2.4.1 pytorch-cuda=12.4 "mkl<2025" "intel-openmp<2025" -c pytorch -c nvidia -y
 conda install habitat-sim=0.3.3 withbullet headless -c conda-forge -c aihabitat -y
 ```
 
 Install Habitat-Lab/Baselines from the revision used for this release, then
-reinstall EnactToM:
+install the repo runtime packages into the same conda env. Do not install
+`requirements.txt` here; that file includes the Python 3.10+ `mini` CLI used by
+the authoring env.
 
 ```bash
 HABITAT_LAB_COMMIT=094d6be2f9d057e4781a68ae792132895fd4d3d0
 
 python -m pip install "git+https://github.com/facebookresearch/habitat-lab.git@${HABITAT_LAB_COMMIT}#subdirectory=habitat-lab"
 python -m pip install "git+https://github.com/facebookresearch/habitat-lab.git@${HABITAT_LAB_COMMIT}#subdirectory=habitat-baselines"
-python -m pip install -r requirements.txt
-python -m pip install -e .
+python -m pip install pillow==10.4.0 numpy-quaternion==2023.0.4 matplotlib==3.6.3 opencv-python==4.10.0.82 openai==2.24.0 pandas pytest unified-planning==1.3.0 up-fast-downward==0.5.2
+python -m pip install -e . --no-deps
+```
+
+When running generation from `enacttom-habitat`, put the py3.10 authoring env's
+`mini` executable on `PATH`:
+
+```bash
+export PATH="$(conda info --base)/envs/enacttom/bin:$PATH"
 ```
 
 If dynamic libraries fail to load, make sure the active conda environment's
@@ -108,7 +125,7 @@ export ENACTTOM_EPISODES_PATH=/absolute/path/to/train_2k.json.gz
 Check required assets:
 
 ```bash
-test -f data/hssd-hab/hssd-hab-enacttom.scene_dataset_config.json
+test -f data/hssd-hab/hssd-hab-partnr.scene_dataset_config.json
 test -f "${ENACTTOM_EPISODES_PATH:-data/datasets/enacttom_episodes/v0_0/train_2k.json.gz}"
 test -d data/objects_ovmm/train_val/hssd/configs/objects
 test -f data/robot_variants/hab_spot_arm/urdf/hab_spot_arm_agent_0_scarlet.urdf
@@ -120,17 +137,6 @@ Configure credentials through environment variables or a repo-root `.env` file:
 
 ```bash
 OPENAI_API_KEY=...
-ANTHROPIC_API_KEY=...
-GEMINI_API_KEY=...
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
-AWS_DEFAULT_REGION=...
-```
-
-AWS Bedrock users should also install the optional client:
-
-```bash
-python -m pip install boto3
 ```
 
 ## Habitat Checks
@@ -140,7 +146,7 @@ Run Habitat-backed checks only after the asset checks pass:
 ```bash
 ./enacttom/run.sh new-scene --agents 2 --output-dir /tmp/enacttom-scene
 ./enacttom/run.sh generate --num-tasks 1 --difficulty standard
-./enacttom/run.sh benchmark --tasks-dir data/enacttom/tasks --model gpt-5.4 --num-times 3
+./enacttom/run.sh benchmark --tasks-dir data/enacttom/tasks --model gpt-5.4-mini --num-times 3
 ```
 
 Missing Habitat dependencies or assets are setup errors and should be fixed

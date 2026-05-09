@@ -17,12 +17,9 @@ from enacttom.task_gen.authoring_surface import get_authoring_default_actions
 from enacttom.task_gen.scene_loader import SceneData
 from enacttom.task_gen.task_bootstrap import build_scene_bootstrap_problem_pddl
 
-SUBMISSION_VERIFICATION_MODELS = [
-    "gpt-5.4",
-    "claude-sonnet-4-6",
-    "gemini-flash",
-]
-SUBMISSION_VERIFICATION_REQUIRED_FAILURES = 2
+SUBMISSION_VERIFICATION_MODELS = ["gpt-5.4-mini"]
+SUBMISSION_VERIFICATION_REQUIRED_FAILURES = 1
+SUBMISSION_VERIFICATION_MODEL_LIST = ", ".join(SUBMISSION_VERIFICATION_MODELS)
 HARD_MODE_STANDARD_PROGRESS_CAP = 0.45
 
 
@@ -595,7 +592,7 @@ class TaskGenSession:
         out.setdefault(
             "HABITAT_SIM_V0_SCENE_DATASET",
             self._resolve_asset_path(
-                "data/hssd-hab/hssd-hab-enacttom.scene_dataset_config.json"
+                "data/hssd-hab/hssd-hab-partnr.scene_dataset_config.json"
             ),
         )
         out.setdefault("HABITAT_DATA_PATH", self._resolve_asset_path("data"))
@@ -662,7 +659,7 @@ class TaskGenSession:
 
         task_dirs = self.state.get("calibration_tasks_dirs") or [self.state.get("output_dir")]
         current = self.state.get("calibration_stats") or {}
-        model = current.get("model") or self.state.get("test_model") or "gpt-5.2"
+        model = current.get("model") or self.state.get("test_model") or "gpt-5.4-mini"
         target_rate = current.get("target_rate", 0.10)
         stats = compute_calibration_stats(task_dirs, model)
         stats["target_rate"] = target_rate
@@ -992,7 +989,7 @@ class TaskGenSession:
 
     def _determine_agent_models(self, task_data: Dict[str, Any]) -> Dict[str, str]:
         num_agents = task_data.get("num_agents", 2)
-        model_name = self.state.get("test_model") or "gpt-5.2"
+        model_name = self.state.get("test_model") or "gpt-5.4-mini"
         return {f"agent_{i}": model_name for i in range(num_agents)}
 
     def _parse_benchmark_subprocess(
@@ -1363,7 +1360,7 @@ class TaskGenSession:
         payload["benchmark_feedback"] = feedback_payload
         payload["feedback_file"] = feedback_payload["markdown_path"]
         payload["action_required"] = (
-            f"At least {required_failures} of gpt-5.4, claude-sonnet-4-6, and gemini-flash must fail. "
+            f"At least {required_failures} of {SUBMISSION_VERIFICATION_MODEL_LIST} must fail. "
             f"Read `{self.benchmark_feedback_md.name}` and address every listed issue before rerunning "
             "taskgen judge -> taskgen test_task -> taskgen verify_task."
         )
@@ -1520,7 +1517,7 @@ class TaskGenSession:
             return failure(
                 "Must run verify_task successfully before submitting. "
                 f"Submission requires at least {SUBMISSION_VERIFICATION_REQUIRED_FAILURES} of "
-                "gpt-5.4, claude-sonnet-4-6, and gemini-flash to fail."
+                f"{SUBMISSION_VERIFICATION_MODEL_LIST} to fail."
             )
 
         allowed_tom_levels = (

@@ -89,6 +89,8 @@ def _normalize_model(model: Optional[str]) -> str:
         return "gpt-5.2"
     if lower.startswith("gpt-5.1-"):
         return "gpt-5.1"
+    if lower == "gpt-5.4-mini" or lower.startswith("gpt-5.4-mini-"):
+        return "gpt-5.4-mini"
     if lower.startswith("gpt-5.4-"):
         return "gpt-5.4"
     if lower.startswith("gpt-5-mini-"):

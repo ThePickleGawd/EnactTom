@@ -14,7 +14,7 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 COMMAND=""
-MODEL="gpt-5.4"
+MODEL="gpt-5.4-mini"
 LLM_PROVIDER=""
 TASK_FILE=""
 TASKS_DIR=""
@@ -26,7 +26,7 @@ TASK_GEN_AGENT="mini"
 QUERY=""
 CATEGORY=""
 GENERATION_DIFFICULTY="standard"
-TARGET_MODEL="gpt-5.4"
+TARGET_MODEL="gpt-5.4-mini"
 TARGET_PASS_RATE=""
 SEED_PASS_RATIO=""
 SEED_FAIL_RATIO=""
@@ -107,7 +107,7 @@ Bulk generation:
 Examples:
   ./enacttom/run.sh generate --num-tasks 3 --difficulty standard
   ./enacttom/run.sh judge --task data/enacttom/tasks/example.json
-  ./enacttom/run.sh benchmark --tasks-dir data/enacttom/tasks --model gpt-5.4 --num-times 3
+  ./enacttom/run.sh benchmark --tasks-dir data/enacttom/tasks --model gpt-5.4-mini --num-times 3
 EOF
 }
 

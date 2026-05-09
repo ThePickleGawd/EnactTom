@@ -1,5 +1,5 @@
 """
-Evaluate task quality using multi-model council (Kimi K2.5 + GPT-5.2).
+Evaluate task quality using the configured judge model(s).
 
 Scores task on category-specific criteria and returns pass/fail with blockers.
 
@@ -25,10 +25,6 @@ from enacttom.cli import CLIResult, failure, success
 from enacttom.cli.task_metadata import compute_strict_tom_metadata
 from enacttom.cli.validate_task import static_validate_trajectory
 from enacttom.task_gen.task_bootstrap import canonicalize_task_problem_pddl
-
-
-SKIPPABLE_STEPS = {"pddl", "tom", "simulation", "structure", "llm-council"}
-
 
 def _dedupe_strings(items: List[str]) -> List[str]:
     deduped: List[str] = []
@@ -139,14 +135,14 @@ def run(
     skip_steps: Optional[List[str]] = None,
 ) -> CLIResult:
     """
-    Evaluate task quality using multi-model council.
+    Evaluate task quality using the configured judge model(s).
 
     Args:
         task_file: Path to task JSON file.
         working_dir: Optional working directory (for scene data, trajectory lookup).
         scene_file: Optional explicit scene data JSON file.
         trajectory_dir: Optional path to benchmark rollout data.
-        models: Council model names (default: ["kimi-k2.5", "gpt-5.2"]).
+        models: Judge model names (default: ["gpt-5.4-mini"]).
         threshold: Overall score threshold for passing.
         difficulty: Difficulty level context (easy/medium/hard).
         user_query: Optional user query the task should align with.
@@ -439,10 +435,7 @@ def run(
             trajectory_dir=traj_path,
         )
     except RuntimeError as e:
-        # RuntimeError from _aggregate means judge council is incomplete due to
-        # infrastructure (429, timeout, etc.). Re-raise to kill the process
-        # rather than letting the agent waste iterations on a non-task issue.
-        if "council incomplete" in str(e) or "All judge models failed" in str(e):
+        if "infrastructure errors" in str(e) or "no model judgments" in str(e):
             raise
         return failure(f"Evaluation failed: {e}")
     except Exception as e:
@@ -479,11 +472,11 @@ def run(
 
     if verdict.passed:
         result_data["summary"] = (
-            f"PASS - All models agree task is valid (score: {verdict.overall_score:.2f})"
+            f"PASS - Judge accepted task (score: {verdict.overall_score:.2f})"
         )
     else:
         result_data["summary"] = (
-            f"FAIL - Task did not pass council (score: {verdict.overall_score:.2f})"
+            f"FAIL - Task did not pass judge (score: {verdict.overall_score:.2f})"
         )
 
     # Save verdict JSON
@@ -643,12 +636,12 @@ if __name__ == "__main__":
 
     from enacttom.cli import print_result
 
-    parser = argparse.ArgumentParser(description="Evaluate task quality with multi-model council")
+    parser = argparse.ArgumentParser(description="Evaluate task quality with judge model(s)")
     parser.add_argument("task_file", help="Path to task JSON file")
     parser.add_argument("--working-dir", default=None, help="Working directory")
     parser.add_argument("--scene-file", default=None, help="Scene data JSON file")
     parser.add_argument("--trajectory-dir", default=None, help="Benchmark rollout data directory")
-    parser.add_argument("--models", default=None, help="Comma-separated council models")
+    parser.add_argument("--models", default=None, help="Comma-separated judge models")
     parser.add_argument("--threshold", type=float, default=0.65, help="Score threshold (default: 0.65)")
     parser.add_argument("--difficulty", default=None, choices=["easy", "medium", "hard"])
     parser.add_argument("--required-tom-level", type=int, default=None)

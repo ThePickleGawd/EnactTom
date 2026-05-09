@@ -45,7 +45,7 @@ def test_build_external_taskgen_prompt_inlines_runtime_context(tmp_path):
     assert "Start with any `*_fields.json` compact views when present" in prompt
     assert "`task`, `active_mechanics`, `mechanic_bindings`, `agent_secrets`, `agent_actions`, `problem_pddl`, and `num_agents`" in prompt
     assert "Open the matching raw task JSON only" in prompt
-    assert "at least 2 of `gpt-5.4`, `claude-sonnet-4-6`, and `gemini-flash` fail" in prompt
+    assert "Submit only if `gpt-5.4-mini` fails" in prompt
     assert "extra_sections" not in prompt
 
 
