@@ -7,7 +7,7 @@ needed for scene generation, replay, and benchmarking.
 ## Local Setup
 
 The local setup runs task validation, PDDL solving, task-generation utilities,
-the default `mini` authoring agent, and the test suite:
+the default `mini` authoring agent, and the in-package test suite:
 
 ```bash
 conda create -n enacttom python=3.10 cmake=3.14.0 -y
@@ -22,7 +22,7 @@ Check the install:
 
 ```bash
 bash -n enacttom/run.sh
-python -m compileall -q enacttom habitat_llm tests
+python -m compileall -q enacttom habitat_llm
 python -m pytest
 ./enacttom/run.sh --help
 ```

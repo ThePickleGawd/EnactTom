@@ -21,7 +21,7 @@ python -m pip install -e .
 ```
 
 `mamba` can be used in place of `conda`. The requirements install the Python
-packages used by local validation, PDDL solving, tests, and the default `mini`
+packages used by local validation, PDDL solving, and the default `mini`
 task-generation agent. Habitat scene execution additionally requires the
 simulator env and assets described in [docs/installation.md](docs/installation.md).
 The split is required because `mini-swe-agent` is Python 3.10+ while
@@ -31,7 +31,7 @@ Run smoke checks:
 
 ```bash
 bash -n enacttom/run.sh
-python -m compileall -q enacttom habitat_llm tests
+python -m compileall -q enacttom habitat_llm
 python -m pytest
 ./enacttom/run.sh --help
 ```
