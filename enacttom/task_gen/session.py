@@ -797,14 +797,6 @@ class TaskGenSession:
         max_scene_retries = 5
         last_error = ""
         for _ in range(max_scene_retries):
-            try:
-                from habitat_llm.utils import get_random_seed
-            except ModuleNotFoundError:
-                import random
-
-                get_random_seed = lambda: random.randint(1, 2**31 - 1)
-
-
             # Ensure subprocess sees the same project-root-relative asset paths
             # regardless of the caller's current working directory.
             env = os.environ.copy()
@@ -817,7 +809,7 @@ class TaskGenSession:
                 "--working-dir",
                 str(self.working_dir),
                 "--seed",
-                str(get_random_seed()),
+                str(random.randint(1, 2**31 - 1)),
             ]
             if scene_id:
                 cmd.extend(["--scene-id", scene_id])

@@ -40,19 +40,14 @@ def validate_runtime_grounding(
     task_data: Dict[str, Any],
     scene_data: Optional["SceneData"] = None,
 ) -> Optional[str]:
-    """
-    Validate that a task is grounded in a real benchmark scene.
-
-    Synthetic fallback scenes are useful for lightweight taskgen/judging
-    environments, but they cannot run in Habitat benchmark mode.
-    """
+    """Validate that a task is grounded in a real benchmark scene."""
     scene_id = str(task_data.get("scene_id", "")).strip()
     episode_id = str(task_data.get("episode_id", "")).strip()
 
     if scene_id in PLACEHOLDER_SCENE_IDS or episode_id in PLACEHOLDER_EPISODE_IDS:
         return (
             "Task is not benchmarkable: scene_id/episode_id must come from a real "
-            "dataset scene, not placeholder synthetic values."
+            "dataset scene, not placeholder scene values."
         )
 
     if scene_data:

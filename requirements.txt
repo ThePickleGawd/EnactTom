@@ -1,9 +1,10 @@
 hydra-core
+litellm==1.83.14
 matplotlib==3.6.3
 mini-swe-agent==1.7.0
 networkx
 numpy==1.26.4
-openai==1.10.0
+openai==2.24.0
 opencv-python==4.10.0.82
 pandas
 pytest

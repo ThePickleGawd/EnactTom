@@ -57,6 +57,9 @@ Generate benchmark tasks after the Habitat setup is complete:
 ./enacttom/run.sh generate --num-tasks 3 --difficulty hard
 ```
 
+`new-scene` and `generate` require real Habitat episodes and fail if Habitat
+dependencies or assets are missing.
+
 Validate and solve a generated task:
 
 ```bash

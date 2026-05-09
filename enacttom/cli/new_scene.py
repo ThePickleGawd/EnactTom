@@ -41,47 +41,13 @@ def main():
     project_root = Path(__file__).parent.parent.parent
     sys.path.insert(0, str(project_root))
 
-    try:
-        from hydra import compose, initialize_config_dir
-        from hydra.core.global_hydra import GlobalHydra
-        from omegaconf import open_dict
+    from hydra import compose, initialize_config_dir
+    from hydra.core.global_hydra import GlobalHydra
+    from omegaconf import open_dict
 
-        from habitat_llm.utils import fix_config, setup_config
+    from habitat_llm.utils.core import fix_config, setup_config
 
-        from enacttom.task_gen.scene_loader import load_scene
-        deps_available = True
-    except ImportError as e:
-        deps_available = False
-        deps_error = str(e)
-
-    if not deps_available:
-        # Minimal fallback for environments without Habitat/Hydra dependencies.
-        # Writes a tiny synthetic scene to current_scene.json so taskgen can proceed.
-        scene_file = Path(args.working_dir) / "current_scene.json"
-        scene_dict = {
-            "scene_id": "synthetic_scene",
-            "episode_id": "synthetic_episode",
-            "rooms": ["room_0", "room_1"],
-            "furniture": ["table_0", "cabinet_0", "table_1", "cabinet_1"],
-            "objects": ["mug_0", "book_0", "key_0", "note_0", "bottle_0"],
-            "furniture_in_rooms": {"room_0": ["table_0", "cabinet_0"], "room_1": ["table_1", "cabinet_1"]},
-            "objects_on_furniture": {"table_0": ["mug_0", "note_0"], "cabinet_0": ["key_0"], "table_1": ["book_0"], "cabinet_1": ["bottle_0"]},
-            "agent_spawns": {"agent_0": "room_0", "agent_1": "room_1"},
-            "valid_agent_ids": [f"agent_{i}" for i in range(args.num_agents)],
-        }
-        with open(scene_file, "w") as f:
-            json.dump(scene_dict, f, indent=2)
-        print_result(success({
-            "scene_data": scene_dict,
-            "episode_id": scene_dict["episode_id"],
-            "scene_id": scene_dict["scene_id"],
-            "scene_file": str(scene_file),
-            "rooms": len(scene_dict["rooms"]),
-            "furniture": len(scene_dict["furniture"]),
-            "objects": len(scene_dict["objects"]),
-            "warning": f"Fallback synthetic scene used due to missing deps: {deps_error}",
-        }))
-        return
+    from enacttom.task_gen.scene_loader import load_scene
 
     # Initialize Hydra config
     try:

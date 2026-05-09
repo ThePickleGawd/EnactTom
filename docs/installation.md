@@ -143,6 +143,9 @@ Run Habitat-backed checks only after the asset checks pass:
 ./enacttom/run.sh benchmark --tasks-dir data/enacttom/tasks --model gpt-5.4 --num-times 3
 ```
 
+Missing Habitat dependencies or assets are setup errors and should be fixed
+before running `generate`.
+
 Legacy task datasets, neural-network skill checkpoints, semantic map/RAG data,
 humanoid assets, and submodules are not required for the trimmed EnactToM paper
 path.
