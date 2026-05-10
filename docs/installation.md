@@ -129,7 +129,7 @@ Check required assets:
 test -f data/hssd-hab/hssd-hab-partnr.scene_dataset_config.json
 test -f "${ENACTTOM_EPISODES_PATH:-data/datasets/enacttom_episodes/v0_0/train_2k.json.gz}"
 test -d data/objects_ovmm/train_val/hssd/configs/objects
-test -f data/robot_variants/hab_spot_arm/urdf/hab_spot_arm_agent_0_scarlet.urdf
+test -f data/robots/hab_spot_arm/urdf/hab_spot_arm.urdf
 ```
 
 ## Model APIs

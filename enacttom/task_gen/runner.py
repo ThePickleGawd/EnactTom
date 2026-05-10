@@ -321,7 +321,7 @@ def _required_habitat_asset_paths(project_root: Path) -> Dict[str, Path]:
         "HSSD scene dataset config": project_root / "data/hssd-hab/hssd-hab-partnr.scene_dataset_config.json",
         "EnactToM episode file": episode_path,
         "OVMM object configs": project_root / "data/objects_ovmm/train_val/hssd/configs/objects",
-        "Spot arm robot URDF": project_root / "data/robot_variants/hab_spot_arm/urdf/hab_spot_arm_agent_0_scarlet.urdf",
+        "Spot arm robot URDF": project_root / "data/robots/hab_spot_arm/urdf/hab_spot_arm.urdf",
     }
 
 

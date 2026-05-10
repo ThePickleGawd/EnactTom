@@ -76,17 +76,17 @@ habitat:
     agents:
       agent_0:
         radius: 0.3
-        articulated_agent_urdf: ./data/robot_variants/hab_spot_arm/urdf/hab_spot_arm_agent_0_scarlet.urdf
+        articulated_agent_urdf: ./data/robots/hab_spot_arm/urdf/hab_spot_arm.urdf
         articulated_agent_type: SpotRobot
         joint_start_noise: 0.0
       agent_1:
         radius: 0.3
-        articulated_agent_urdf: ./data/robot_variants/hab_spot_arm/urdf/hab_spot_arm_agent_1_cobalt.urdf
+        articulated_agent_urdf: ./data/robots/hab_spot_arm/urdf/hab_spot_arm.urdf
         articulated_agent_type: SpotRobot
         joint_start_noise: 0.0
       agent_2:
         radius: 0.3
-        articulated_agent_urdf: ./data/robot_variants/hab_spot_arm/urdf/hab_spot_arm_agent_2_emerald.urdf
+        articulated_agent_urdf: ./data/robots/hab_spot_arm/urdf/hab_spot_arm.urdf
         articulated_agent_type: SpotRobot
         joint_start_noise: 0.0
     kinematic_mode: True
