@@ -1,8 +1,7 @@
 # Installation
 
 This page gives the complete setup for EnactToM. The top-level README contains
-the short local setup; this file adds the Habitat simulator and asset steps
-needed for scene generation, replay, and benchmarking.
+the quickstart, and the [docs README](README.md) contains usage examples.
 
 ## Local Setup
 
@@ -68,15 +67,8 @@ python -m pip install pillow==10.4.0 numpy-quaternion==2023.0.4 matplotlib==3.6.
 python -m pip install -e . --no-deps
 ```
 
-When running generation from `enacttom-habitat`, keep the active Habitat env
-first on `PATH` and add the py3.10 authoring env's `mini` executable after it:
-
-```bash
-export PATH="$CONDA_PREFIX/bin:$(conda info --base)/envs/enacttom/bin:$PATH"
-```
-
-If dynamic libraries fail to load, make sure the active conda environment's
-`lib` directory is on `LD_LIBRARY_PATH`.
+Install and authenticate the external task-generation CLI you plan to use before
+running generation.
 
 ## Assets
 

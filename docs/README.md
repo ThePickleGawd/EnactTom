@@ -1,0 +1,65 @@
+# Usage
+
+All user-facing commands go through the repository entry point:
+
+```bash
+./enacttom/run.sh <command> [options]
+```
+
+For full environment and asset setup, see [installation.md](installation.md).
+
+## Credentials
+
+Task generation, judging, and benchmarking use model APIs. Configure keys in the
+shell or in a repo-root `.env` file:
+
+```bash
+OPENAI_API_KEY=...
+```
+
+## Generate Tasks
+
+Run generation after the Habitat setup is complete and the requested external
+task-generation agent CLI is installed and authenticated.
+
+```bash
+conda activate enacttom-habitat
+./enacttom/run.sh generate --num-tasks 3 --difficulty standard
+./enacttom/run.sh generate --num-tasks 3 --difficulty hard
+```
+
+`new-scene` and `generate` require real Habitat episodes and fail if Habitat
+dependencies or assets are missing.
+
+## Validate A Task
+
+```bash
+TASK=path/to/task.json
+./enacttom/run.sh validate-task --task "$TASK"
+./enacttom/run.sh verify-pddl --task "$TASK"
+./enacttom/run.sh verify --task "$TASK"
+./enacttom/run.sh judge --task "$TASK"
+```
+
+## Benchmark Agents
+
+```bash
+./enacttom/run.sh benchmark \
+  --tasks-dir data/enacttom/tasks \
+  --model gpt-5.4-mini \
+  --num-times 3
+```
+
+Repeated benchmark runs report mean pass rate, pass-rate standard deviation,
+`pass@k`, and `pass^k` for `k = --num-times`.
+
+## Supported Scope
+
+This release contains the EnactToM paper pipeline: scene exploration, task
+generation, validation, PDDL solvability checks, Habitat replay, ToM judging,
+and agent benchmarking. Supported Habitat presets are the paper-scale 2-, 3-,
+and 4-agent Spot robot configurations.
+
+Supported task mechanics are `room_restriction`, `limited_bandwidth`,
+`restricted_communication`, `remote_control`, `state_mirroring`, and
+`inverse_state`.
